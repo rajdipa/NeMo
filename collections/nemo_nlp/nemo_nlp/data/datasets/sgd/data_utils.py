@@ -31,7 +31,7 @@ import collections
 from nemo.utils.exp_logging import get_logger
 from nemo_nlp.data.datasets.sgd import tokenization
 
-import schema
+from . import schema
 
 # Dimension of the embedding for intents, slots and categorical slot values in
 # the schema. Should be equal to BERT's hidden_size.
@@ -76,173 +76,22 @@ FILE_RANGES = {
 # metrics.
 PER_FRAME_OUTPUT_FILENAME = "dialogues_and_metrics.json"
 
-DATABASE_EXISTS_TMP = '{} dataset has already been processed and stored at {}'
-MODE_EXISTS_TMP = \
-	'{} mode of {} dataset has already been processed and stored at {}'
-
 logger = get_logger('')
-
-
-def if_exist(outfold, files):
-	if not os.path.exists(outfold):
-		return False
-	for file in files:
-		if not os.path.exists(f'{outfold}/{file}'):
-			return False
-	return True
-
-
-class StateTrackingSGDDataDesc:
-	""" Convert the raw data to the standard format supported by
-	StateTrackingSGDData.
-	TODO: Update here
-
-	By default, the None label for slots is 'O'.
-
-	JointIntentSlotDataset requires two files:
-
-		input_file: file to sequence + label.
-			the first line is header (sentence [tab] label)
-			each line should be [sentence][tab][label]
-
-		slot_file: file to slot labels, each line corresponding to
-			slot labels for a sentence in input_file. No header.
-
-	To keep the mapping from label index to label consistent during
-	training and inferencing, we require the following files:
-		dicts.intents.csv: each line is an intent. The first line
-			corresponding to the 0 intent label, the second line
-			corresponding to the 1 intent label, and so on.
-
-		dicts.slots.csv: each line is a slot. The first line
-			corresponding to the 0 slot label, the second line
-			corresponding to the 1 slot label, and so on.
-
-	Args:
-		data_dir (str): the directory of the dataset
-		do_lower_case (bool): whether to set your dataset to lowercase
-		dataset_name (str): the name of the dataset. If it's a dataset
-			that follows the standard JointIntentSlotDataset format,
-			you can set the name as 'default'.
-		none_slot_label (str): the label for slots that aren't indentified
-			defaulted to 'O'
-		pad_label (int): the int used for padding. If set to -1,
-			 it'll be set to the whatever the None label is.
-
-	"""
-
-	def __init__(self,
-				 data_dir,
-				 tokenizer,
-				 task_name,
-				 dataset_split,
-				 do_lower_case=False,
-				 dataset_name='default',
-				 none_slot_label='O',
-				 pad_label=-1,
-				 max_seq_length=50,
-				 modes=['train', 'eval'],
-				 log_data_warnings=False):
-		if dataset_name == 'sgd':
-			self.data_dir = process_sgd(data_dir,
-										do_lower_case,
-										dataset_name=dataset_name,
-										max_seq_length=max_seq_length,
-										task_name=task_name,
-										tokenizer=tokenizer,
-										dataset_split=dataset_split,
-										modes=modes,
-										log_data_warnings=log_data_warnings)
-		else:
-			if not if_exist(data_dir, ['dialogues.tsv']):
-				raise FileNotFoundError(
-					"Make sure that your data follows the standard format "
-					"supported by StateTrackerDataset. Your data must "
-					"contain dialogues.tsv.")
-			self.data_dir = data_dir
-
-	# Changed here
-	# self.intent_dict_file = self.data_dir + '/dict.intents.csv'
-	# self.slot_dict_file = self.data_dir + '/dict.slots.csv'
-	# self.num_intents = len(get_vocab(self.intent_dict_file))
-	# slots = label2idx(self.slot_dict_file)
-	# self.num_slots = len(slots)
-	#
-	# for mode in ['train', 'test', 'eval']:
-	#
-	# 	if not if_exist(self.data_dir, [f'{mode}.tsv']):
-	# 		logger.info(f' Stats calculation for {mode} mode'
-	# 					f' is skipped as {mode}.tsv was not found.')
-	# 		continue
-	#
-	# 	slot_file = f'{self.data_dir}/{mode}_slots.tsv'
-	# 	with open(slot_file, 'r') as f:
-	# 		slot_lines = f.readlines()
-	#
-	# 	input_file = f'{self.data_dir}/{mode}.tsv'
-	# 	with open(input_file, 'r') as f:
-	# 		input_lines = f.readlines()[1:]  # Skipping headers at index 0
-	#
-	# 	if len(slot_lines) != len(input_lines):
-	# 		raise ValueError(
-	# 			"Make sure that the number of slot lines match the "
-	# 			"number of intent lines. There should be a 1-1 "
-	# 			"correspondence between every slot and intent lines.")
-	#
-	# 	dataset = list(zip(slot_lines, input_lines))
-	#
-	# 	raw_slots, queries, raw_intents = [], [], []
-	# 	for slot_line, input_line in dataset:
-	# 		slot_list = [int(slot) for slot in slot_line.strip().split()]
-	# 		raw_slots.append(slot_list)
-	# 		parts = input_line.strip().split()
-	# 		raw_intents.append(int(parts[-1]))
-	# 		queries.append(' '.join(parts[:-1]))
-	#
-	# 	infold = input_file[:input_file.rfind('/')]
-	#
-	# 	logger.info(f'Three most popular intents during {mode}ing')
-	# 	total_intents, intent_label_freq = get_label_stats(
-	# 		raw_intents, infold + f'/{mode}_intent_stats.tsv')
-	# 	merged_slots = itertools.chain.from_iterable(raw_slots)
-	#
-	# 	logger.info(f'Three most popular slots during {mode}ing')
-	# 	slots_total, slots_label_freq = get_label_stats(
-	# 		merged_slots, infold + f'/{mode}_slot_stats.tsv')
-	#
-	# 	if mode == 'train':
-	# 		self.slot_weights = calc_class_weights(slots_label_freq)
-	# 		logger.info(f'Slot weights are - {self.slot_weights}')
-	#
-	# 		self.intent_weights = calc_class_weights(intent_label_freq)
-	# 		logger.info(f'Intent weights are - {self.intent_weights}')
-	#
-	# 	logger.info(f'Total intents - {total_intents}')
-	# 	logger.info(f'Intent label frequency - {intent_label_freq}')
-	# 	logger.info(f'Total Slots - {slots_total}')
-	# 	logger.info(f'Slots label frequency - {slots_label_freq}')
-	#
-	# if pad_label != -1:
-	# 	self.pad_label = pad_label
-	# else:
-	# 	if none_slot_label not in slots:
-	# 		raise ValueError(f'none_slot_label {none_slot_label} not '
-	# 						 f'found in {self.slot_dict_file}.')
-	# 	self.pad_label = slots[none_slot_label]
 
 
 class Dstc8DataProcessor(object):
 	"""Data generator for dstc8 dialogues."""
 
 	def __init__(self,
-	               dstc8_data_dir,
-	               train_file_range,
-	               dev_file_range,
-	               test_file_range,
-	               vocab_file,
-	               do_lower_case,
-	               max_seq_length=DEFAULT_MAX_SEQ_LENGTH,
-	               log_data_warnings=False):
+                 dstc8_data_dir,
+                 train_file_range,
+                 dev_file_range,
+                 test_file_range,
+                 vocab_file,
+                 do_lower_case,
+                 preserve_unused_tokens,
+                 max_seq_length=DEFAULT_MAX_SEQ_LENGTH,
+                 log_data_warnings=False):
 	    self.dstc8_data_dir = dstc8_data_dir
 	    self._log_data_warnings = log_data_warnings
 	    self._file_ranges = {
@@ -252,7 +101,9 @@ class Dstc8DataProcessor(object):
 	    }
 	    # BERT tokenizer
 	    self._tokenizer = tokenization.FullTokenizer(
-	        vocab_file=vocab_file, do_lower_case=do_lower_case)
+	        vocab_file=vocab_file,
+	        do_lower_case=do_lower_case,
+	        preserve_unused_tokens=preserve_unused_tokens)
 	    self._max_seq_length = max_seq_length
 
 	def get_dialog_examples(self, dataset):
@@ -793,68 +644,68 @@ def _naive_tokenize(s):
 	return seq_tok
 
 
-def process_sgd(infold,
-				uncased,
-				dataset_name,
-				task_name,
-				tokenizer,
-				encoder,
-				dataset_split,
-				max_seq_length,
-				modes,
-				log_data_warnings):
-	""" process and convert SGD dataset into CSV files
-	"""
-	outfold = f'{infold}/{dataset_name}-nemo-processed'
-	infold = f'{infold}/'
+# def process_sgd(infold,
+# 				uncased,
+# 				dataset_name,
+# 				task_name,
+# 				tokenizer,
+# 				encoder,
+# 				dataset_split,
+# 				max_seq_length,
+# 				modes,
+# 				log_data_warnings):
+# 	""" process and convert SGD dataset into CSV files
+# 	"""
+# 	outfold = f'{infold}/{dataset_name}-nemo-processed'
+# 	infold = f'{infold}/'
 
-	if uncased:
-		outfold = f'{outfold}-uncased'
+# 	if uncased:
+# 		outfold = f'{outfold}-uncased'
 
-	# if if_exist(outfold, ['dialogues.tsv']):
-	# 	logger.info(DATABASE_EXISTS_TMP.format(dataset_name, outfold))
-	# 	return outfold
+# 	# if if_exist(outfold, ['dialogues.tsv']):
+# 	# 	logger.info(DATABASE_EXISTS_TMP.format(dataset_name, outfold))
+# 	# 	return outfold
 
-	logger.info(f'Processing {dataset_name} dataset and store at {outfold}')
+# 	logger.info(f'Processing {dataset_name} dataset and store at {outfold}')
 
-	os.makedirs(outfold, exist_ok=True)
+# 	os.makedirs(outfold, exist_ok=True)
 
-	processor = Dstc8DataProcessor(
-		infold,
-		train_file_range=FILE_RANGES[task_name]["train"],
-		dev_file_range=FILE_RANGES[task_name]["dev"],
-		test_file_range=FILE_RANGES[task_name]["test"],
-		tokenizer=tokenizer,
-		max_seq_length=max_seq_length,
-		log_data_warnings=log_data_warnings)
+# 	processor = Dstc8DataProcessor(
+# 		infold,
+# 		train_file_range=FILE_RANGES[task_name]["train"],
+# 		dev_file_range=FILE_RANGES[task_name]["dev"],
+# 		test_file_range=FILE_RANGES[task_name]["test"],
+# 		tokenizer=tokenizer,
+# 		max_seq_length=max_seq_length,
+# 		log_data_warnings=log_data_warnings)
 
-	logger.info("Start generating the dialogue examples.")
-	_create_dialog_examples(processor, outfold + "/dialogues.tsv", dataset_split)
-	logger.info("Finish generating the dialogue examples.")
+# 	logger.info("Start generating the dialogue examples.")
+# 	_create_dialog_examples(processor, outfold + "/dialogues.tsv", dataset_split)
+# 	logger.info("Finish generating the dialogue examples.")
 
-	# Generate the schema embeddings if needed or specified.
-	# vocab_file = os.path.join(FLAGS.bert_ckpt_dir, "vocab.txt")
-	# bert_init_ckpt = os.path.join(FLAGS.bert_ckpt_dir, "bert_model.ckpt")
-	# tokenization.validate_case_matches_checkpoint(
-	# 	do_lower_case=FLAGS.do_lower_case, init_checkpoint=bert_init_ckpt)
-	#
-	# bert_config = modeling.BertConfig.from_json_file(
-	# 	os.path.join(FLAGS.bert_ckpt_dir, "bert_config.json"))
-	# if FLAGS.max_seq_length > bert_config.max_position_embeddings:
-	# 	raise ValueError(
-	# 		"Cannot use sequence length %d because the BERT model "
-	# 		"was only trained up to sequence length %d" %
-	# 		(FLAGS.max_seq_length, bert_config.max_position_embeddings))
+# 	# Generate the schema embeddings if needed or specified.
+# 	# vocab_file = os.path.join(FLAGS.bert_ckpt_dir, "vocab.txt")
+# 	# bert_init_ckpt = os.path.join(FLAGS.bert_ckpt_dir, "bert_model.ckpt")
+# 	# tokenization.validate_case_matches_checkpoint(
+# 	# 	do_lower_case=FLAGS.do_lower_case, init_checkpoint=bert_init_ckpt)
+# 	#
+# 	# bert_config = modeling.BertConfig.from_json_file(
+# 	# 	os.path.join(FLAGS.bert_ckpt_dir, "bert_config.json"))
+# 	# if FLAGS.max_seq_length > bert_config.max_position_embeddings:
+# 	# 	raise ValueError(
+# 	# 		"Cannot use sequence length %d because the BERT model "
+# 	# 		"was only trained up to sequence length %d" %
+# 	# 		(FLAGS.max_seq_length, bert_config.max_position_embeddings))
 
-	schema_embedding_file = os.path.join(
-		infold,
-		f"{dataset_split}_pretrained_schema_embedding.npy")
-	if not if_exist("", [schema_embedding_file]):
-		logger.info("Start generating the schema embeddings.")
-		_create_schema_embeddings(encoder, schema_embedding_file)
-		logger.info("Finish generating the schema embeddings.")
+# 	schema_embedding_file = os.path.join(
+# 		infold,
+# 		f"{dataset_split}_pretrained_schema_embedding.npy")
+# 	if not if_exist("", [schema_embedding_file]):
+# 		logger.info("Start generating the schema embeddings.")
+# 		_create_schema_embeddings(encoder, schema_embedding_file)
+# 		logger.info("Finish generating the schema embeddings.")
 
-	return outfold
+# 	return outfold
 
 
 def _create_schema_embeddings(encoder, schema_embedding_file):
@@ -918,18 +769,11 @@ def list_to_str(l):
 # https://github.com/google-research/bert/blob/master/run_classifier.py.
 def file_based_convert_examples_to_features(dial_examples, output_file):
 	"""Convert a set of `InputExample`s to a TFRecord file."""
-	# Changed Here
-	# writer = tf.io.TFRecordWriter(output_file)
 	writer = open(output_file, "w")
 
 	for (ex_index, example) in enumerate(dial_examples):
 		if ex_index % 10000 == 0:
 			logger.info(f'Writing example {ex_index} of {len(dial_examples)}')
-
-		# if isinstance(example, PaddingInputExample):
-		# 	ex = InputExample()
-		# else:
-		# 	ex = example
 
 		ex = example
 		features = collections.OrderedDict()
@@ -963,7 +807,7 @@ def file_based_convert_examples_to_features(dial_examples, output_file):
 		if ex_index == 0:
 			header = "\t".join(features.keys())
 			writer.write(header + "\n")
-		# tf_example = tf.train.Example(features=tf.train.Features(feature=features))
+
 		csv_example = "\t".join(list(features.values()))
 		writer.write(csv_example + "\n")
 	writer.close()
