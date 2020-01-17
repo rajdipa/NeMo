@@ -9,6 +9,7 @@ __all__ = ['TextDataLayer',
            'BertJointIntentSlotDataLayer',
            'BertJointIntentSlotInferDataLayer',
            'LanguageModelingDataLayer',
+           'BertInferDataLayer',
            'BertTokenClassificationDataLayer',
            'BertTokenClassificationInferDataLayer',
            'BertPunctuationCapitalizationDataLayer',
@@ -394,6 +395,95 @@ class LanguageModelingDataLayer(TextDataLayer):
                           'tokenizer': tokenizer,
                           'max_seq_length': max_seq_length,
                           'batch_step': batch_step}
+        super().__init__(dataset_type, dataset_params, **kwargs)
+
+
+class BertInferDataLayer(TextDataLayer):
+    """
+    Data layer to run infernce with BERT (get final hidden layer).
+
+    Args:
+        tokenizer (TokenizerSpec): tokenizer
+        dataset (str): directory or a single file with dataset documents
+        max_seq_length (int): maximum allowed length of the text segments
+        mask_probability (float): probability of masking input sequence tokens
+        batch_size (int): batch size in segments
+        short_seeq_prob (float): Probability of creating sequences which are
+            shorter than the maximum length.
+            Defualts to 0.1.
+    """
+
+    @property
+    def output_ports(self):
+        """Returns definitions of module output ports.
+
+        input_ids: indices of tokens which constitute batches of text segments
+            0: AxisType(BatchTag)
+
+            1: AxisType(TimeTag)
+
+        input_type_ids: indices of token types (e.g., sentences A & B in BERT)
+            0: AxisType(BatchTag)
+
+            1: AxisType(TimeTag)
+
+        input_mask: bool tensor with 0s in place of tokens to be masked
+            0: AxisType(BatchTag)
+
+            1: AxisType(TimeTag)
+
+        embedding_tensor_name: TODO
+            .......
+
+        """
+        return {
+            "input_ids": NeuralType({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "input_type_ids": NeuralType({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "input_mask": NeuralType({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "embedding_tensor_name": NeuralType({
+            0: AxisType(BatchTag),
+            1: AxisType(TimeTag)
+            }),
+            "service_id": NeuralType({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "intent_or_slot_id": NeuralType({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "value_id": NeuralType({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            })
+          }
+
+    def __init__(self,
+                 tokenizer,
+                 max_seq_length,
+                 input_file,
+                 output_file,
+                 bert_model,
+                 dataset_type,
+                 batch_size=1,
+                 **kwargs):
+        kwargs['batch_size'] = batch_size
+        dataset_params = {
+                          'tokenizer': tokenizer,
+                          'max_seq_length': max_seq_length,
+                          'input_file': input_file,
+                          'output_file': output_file,
+                          'bert_model': bert_model
+                          }
         super().__init__(dataset_type, dataset_params, **kwargs)
 
 

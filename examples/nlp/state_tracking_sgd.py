@@ -106,13 +106,13 @@ parser.add_argument("--amp_opt_level", default="O0",
 args = parser.parse_args()
 
 if not os.path.exists(args.data_dir):
-    raise ValueError(f'Data not found at {args.data_dir}')
+    raise ValueError('Data not found at {args.data_dir}')
 
 task_name = args.task_name
 vocab_file = os.path.join(args.bert_ckpt_dir, "vocab.txt")
 
 if not os.path.exists(vocab_file):
-    raise ValueError(f'vocab_file.txt not found at {vocab_file}')
+    raise ValueError('vocab_file.txt not found at {args.bert_ckpt_dir}')
 
 work_dir = f'{args.work_dir}/{args.task_name.upper()}'
 nf = nemo.core.NeuralModuleFactory(backend=nemo.core.Backend.PyTorch,
@@ -142,14 +142,18 @@ if not os.path.exists(args.dialogues_example_dir):
     os.makedirs(args.dialogues_example_dir)
 if not os.path.exists(dial_file):
 	nf.logger.info("Start generating the dialogue examples.")
+	data_utils._create_dialog_examples(processor, dial_file, args.dataset_split)
+	nf.logger.info("Finish generating the dialogue examples.")
 
-data_utils._create_dialog_examples(processor, dial_file, args.dataset_split)
-nf.logger.info("Finish generating the dialogue examples.")
+# Generate the schema embeddings if needed or specified.
+bert_init_ckpt = os.path.join(args.bert_ckpt_dir, "bert_model.ckpt")
 
-# # Generate the schema embeddings if needed or specified.
-# bert_init_ckpt = os.path.join(args.bert_ckpt_dir, "bert_model.ckpt")
-# tokenization.validate_case_matches_checkpoint(
-#   do_lower_case=args.do_lower_case, init_checkpoint=bert_init_ckpt)
+pretrained_bert_model = nemo_nlp.huggingface.BERT(
+	pretrained_model_name="bert-base-cased", factory=nf)
+# hidden_size = pretrained_bert_model.local_parameters["hidden_size"]
+
+tokenization.validate_case_matches_checkpoint(
+  do_lower_case=args.do_lower_case, init_checkpoint=bert_init_ckpt)
 
 # bert_config = modeling.BertConfig.from_json_file(
 #   os.path.join(FLAGS.bert_ckpt_dir, "bert_config.json"))
@@ -159,7 +163,60 @@ nf.logger.info("Finish generating the dialogue examples.")
 #     "was only trained up to sequence length %d" %
 #     (FLAGS.max_seq_length, bert_config.max_position_embeddings))
 
+# fix
+bert_config = os.path.join(args.bert_ckpt_dir, 'bert_config.json')
+if not os.path.exists(bert_config):
+    raise ValueError(f'bert_config.json not found at {args.bert_ckpt_dir}')
 
+schema_embedding_file = os.path.join(args.schema_embedding_dir,
+	"{}_pretrained_schema_embedding.npy".format(args.dataset_split))
+nf.logger.info("Start generating the schema embeddings.")
+
+# create schema embedding if no file exists
+# TODO fix check
+schema_json_path = os.path.join(args.data_dir, 
+								args.dataset_split,
+								"schema.json")
+
+vocab_file = os.path.join(args.bert_ckpt_dir, "vocab.txt")
+tokenizer = tokenization.FullTokenizer(vocab_file=vocab_file,
+									   do_lower_case=args.do_lower_case,
+									   preserve_unused_tokens=args.preserve_unused_tokens)
+
+emb_datalayer = nemo_nlp.BertInferDataLayer(dataset_type='SchemaEmbeddingDataset',
+											tokenizer=tokenizer,
+								   			max_seq_length=args.max_seq_length,
+								   			input_file=schema_json_path,
+								   			output_file=schema_embedding_file,
+								   			bert_model=pretrained_bert_model)
+
+print ('TO DO >>>')
+# emb_generator.save_embeddings(schemas,
+# 							  schema_embedding_file)
+
+nf.logger.info("Finish generating the schema embeddings.")
+
+(input_ids, input_mask, input_type_ids, embedding_tensor_name, service_ids,
+	intent_or_slot_id, value_id) = emb_datalayer()
+
+hidden_states = pretrained_bert_model(input_ids=input_ids,
+                                token_type_ids=input_type_ids,
+                                attention_mask=input_mask)
+
+evaluated_tensors = nf.infer(tensors=[hidden_states],
+    						 checkpoint_dir=args.bert_ckpt_dir)
+
+def concatenate(lists):
+    return np.concatenate([t.cpu() for t in lists])
+
+
+def get_preds(logits):
+    return np.argmax(logits, 1)
+
+
+hidden_states = [concatenate(tensors) for tensors in evaluated_tensors]
+import pdb; pdb.set_trace()
+print()
 
 # """ Load the pretrained BERT parameters
 # See the list of pretrained models, call:

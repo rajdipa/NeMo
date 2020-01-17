@@ -708,43 +708,6 @@ def _naive_tokenize(s):
 # 	return outfold
 
 
-def _create_schema_embeddings(encoder, schema_embedding_file):
-	"""Create schema embeddings and save it into file."""
-	# if not tf.io.gfile.exists(FLAGS.schema_embedding_dir):
-	# 	tf.io.gfile.makedirs(FLAGS.schema_embedding_dir)
-
-	schema_emb_run_config = tf.contrib.tpu.RunConfig(
-		master=FLAGS.master,
-		tpu_config=tf.contrib.tpu.TPUConfig(
-			num_shards=FLAGS.num_tpu_cores,
-			per_host_input_for_training=is_per_host))
-
-	schema_json_path = os.path.join(FLAGS.dstc8_data_dir, FLAGS.dataset_split,
-									"schema.json")
-	schemas = schema.Schema(schema_json_path)
-
-	# Prepare BERT model for embedding a natural language descriptions.
-	bert_init_ckpt = os.path.join(FLAGS.bert_ckpt_dir, "bert_model.ckpt")
-	schema_emb_model_fn = extract_schema_embedding.model_fn_builder(
-		bert_config=bert_config,
-		init_checkpoint=bert_init_ckpt,
-		use_tpu=FLAGS.use_tpu,
-		use_one_hot_embeddings=FLAGS.use_one_hot_embeddings)
-	# If TPU is not available, this will fall back to normal Estimator on CPU
-	# or GPU.
-	schema_emb_estimator = tf.contrib.tpu.TPUEstimator(
-		use_tpu=FLAGS.use_tpu,
-		model_fn=schema_emb_model_fn,
-		config=schema_emb_run_config,
-		predict_batch_size=FLAGS.predict_batch_size)
-	vocab_file = os.path.join(FLAGS.bert_ckpt_dir, "vocab.txt")
-	tokenizer = tokenization.FullTokenizer(
-		vocab_file=vocab_file, do_lower_case=FLAGS.do_lower_case)
-	emb_generator = extract_schema_embedding.SchemaEmbeddingGenerator(
-		tokenizer, schema_emb_estimator, FLAGS.max_seq_length)
-	emb_generator.save_embeddings(schemas, schema_embedding_file)
-
-
 def load_dialogues(dialog_json_filepaths):
 	"""Obtain the list of all dialogues from specified json files."""
 	dialogs = []

@@ -8,6 +8,6 @@ from .token_classification import (BertTokenClassificationDataset,
                                    BertTokenClassificationInferDataset)
 from .punctuation_capitalization import BertPunctuationCapitalizationDataset,\
   BertPunctuationCapitalizationInferDataset
-from .sgd import SGDDataset
+from .sgd.schema_embedding_dataset import SchemaEmbeddingDataset
 from .sentence_classification import BertSentenceClassificationDataset
 from .translation import TranslationDataset
