@@ -449,22 +449,22 @@ class BertInferDataLayer(TextDataLayer):
                 0: AxisType(BatchTag),
                 1: AxisType(TimeTag)
             }),
-            "embedding_tensor_name": NeuralType({
-            0: AxisType(BatchTag),
-            1: AxisType(TimeTag)
-            }),
-            "service_id": NeuralType({
-                0: AxisType(BatchTag),
-                1: AxisType(TimeTag)
-            }),
-            "intent_or_slot_id": NeuralType({
-                0: AxisType(BatchTag),
-                1: AxisType(TimeTag)
-            }),
-            "value_id": NeuralType({
-                0: AxisType(BatchTag),
-                1: AxisType(TimeTag)
-            })
+            # "embedding_tensor_name": NeuralType({
+            # 0: AxisType(BatchTag),
+            # 1: AxisType(TimeTag)
+            # }),
+            # "service_id": NeuralType({
+            #     0: AxisType(BatchTag),
+            #     1: AxisType(TimeTag)
+            # }),
+            # "intent_or_slot_id": NeuralType({
+            #     0: AxisType(BatchTag),
+            #     1: AxisType(TimeTag)
+            # }),
+            # "value_id": NeuralType({
+            #     0: AxisType(BatchTag),
+            #     1: AxisType(TimeTag)
+            # })
           }
 
     def __init__(self,

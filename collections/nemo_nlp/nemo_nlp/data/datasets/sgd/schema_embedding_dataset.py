@@ -111,16 +111,17 @@ class SchemaEmbeddingDataset(Dataset):
   #     return d
 
     def __len__(self):
-        return len(self.features)
+        return len(self.features['input_ids'])
 
     def __getitem__(self, idx):
         return (np.array(self.features['input_ids'][idx]),
                 np.array(self.features['input_mask'][idx], dtype=np.long),
                 np.array(self.features['input_type_ids'][idx]),
-                np.array(self.features['embedding_tensor_name'][idx]),
-                np.array(self.features['service_id']),
-                np.array(self.features['intent_or_slot_id']),
-                np.array(self.features['value_id']))
+                # np.array(self.features['embedding_tensor_name'][idx]),
+                # np.array(self.features['service_id']),
+                # np.array(self.features['intent_or_slot_id']),
+                # np.array(self.features['value_id'])
+                )
 
 
   
@@ -378,11 +379,11 @@ class SchemaEmbeddingDataset(Dataset):
     #     embedding_dim = data_utils.EMBEDDING_DIMENSION
     #     for _ in schemas.services:
     #         schema_embs.append({
-    #           "intent_emb": np.zeros([max_num_intent, embedding_dim]),
-    #           "req_slot_emb": np.zeros([max_num_slot, embedding_dim]),
-    #           "cat_slot_emb": np.zeros([max_num_cat_slot, embedding_dim]),
-    #           "noncat_slot_emb": np.zeros([max_num_noncat_slot, embedding_dim]),
-    #           "cat_slot_value_emb":
+    #           "intent_emb": np.zeros([max_num_intent, embedding_dim]), # 4 * 768
+    #           "req_slot_emb": np.zeros([max_num_slot, embedding_dim]), # 18 * 768
+    #           "cat_slot_emb": np.zeros([max_num_cat_slot, embedding_dim]), # 6 * 768
+    #           "noncat_slot_emb": np.zeros([max_num_noncat_slot, embedding_dim]), # 12 * 768
+    #           "cat_slot_value_emb": # 6 * 11 * 768
     #               np.zeros([max_num_cat_slot, max_num_value, embedding_dim]),
     #       })
     #     # Populate the embeddings based on bert inference results and save them.

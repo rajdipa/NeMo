@@ -8,10 +8,10 @@ import math
 import os
 
 import numpy as np
+import pickle
 from pytorch_transformers import BertTokenizer
 
 import nemo
-
 import nemo_nlp
 import nemo_nlp.data.datasets.sgd.data_utils as data_utils
 from nemo_nlp.data.datasets.sgd import tokenization
@@ -170,53 +170,65 @@ if not os.path.exists(bert_config):
 
 schema_embedding_file = os.path.join(args.schema_embedding_dir,
 	"{}_pretrained_schema_embedding.npy".format(args.dataset_split))
-nf.logger.info("Start generating the schema embeddings.")
 
-# create schema embedding if no file exists
-# TODO fix check
-schema_json_path = os.path.join(args.data_dir, 
-								args.dataset_split,
-								"schema.json")
+if not os.path.exists(schema_embedding_file):
+	nf.logger.info("Start generating the schema embeddings.")
+	# create schema embedding if no file exists
+	# TODO move to DataDescription
+	schema_json_path = os.path.join(args.data_dir, 
+									args.dataset_split,
+									"schema.json")
 
-vocab_file = os.path.join(args.bert_ckpt_dir, "vocab.txt")
-tokenizer = tokenization.FullTokenizer(vocab_file=vocab_file,
-									   do_lower_case=args.do_lower_case,
-									   preserve_unused_tokens=args.preserve_unused_tokens)
+	vocab_file = os.path.join(args.bert_ckpt_dir, "vocab.txt")
+	tokenizer = tokenization.FullTokenizer(vocab_file=vocab_file,
+										   do_lower_case=args.do_lower_case,
+										   preserve_unused_tokens=args.preserve_unused_tokens)
 
-emb_datalayer = nemo_nlp.BertInferDataLayer(dataset_type='SchemaEmbeddingDataset',
-											tokenizer=tokenizer,
-								   			max_seq_length=args.max_seq_length,
-								   			input_file=schema_json_path,
-								   			output_file=schema_embedding_file,
-								   			bert_model=pretrained_bert_model)
+	emb_datalayer = nemo_nlp.BertInferDataLayer(dataset_type='SchemaEmbeddingDataset',
+												tokenizer=tokenizer,
+									   			max_seq_length=args.max_seq_length,
+									   			input_file=schema_json_path,
+									   			output_file=schema_embedding_file,
+									   			bert_model=pretrained_bert_model)
 
-print ('TO DO >>>')
-# emb_generator.save_embeddings(schemas,
-# 							  schema_embedding_file)
+	print ('TO DO >>>')
+	# emb_generator.save_embeddings(schemas,
+	# 							  schema_embedding_file)
 
-nf.logger.info("Finish generating the schema embeddings.")
+	nf.logger.info("Finish generating the schema embeddings.")
 
-(input_ids, input_mask, input_type_ids, embedding_tensor_name, service_ids,
-	intent_or_slot_id, value_id) = emb_datalayer()
+	input_ids, input_mask, input_type_ids = emb_datalayer()
 
-hidden_states = pretrained_bert_model(input_ids=input_ids,
-                                token_type_ids=input_type_ids,
-                                attention_mask=input_mask)
+	schema_embeddings = emb_datalayer.dataset.schema_embeddings
+	hidden_states = pretrained_bert_model(input_ids=input_ids,
+			                              token_type_ids=input_type_ids,
+			                              attention_mask=input_mask)
 
-evaluated_tensors = nf.infer(tensors=[hidden_states],
-    						 checkpoint_dir=args.bert_ckpt_dir)
+	evaluated_tensors = nf.infer(tensors=[hidden_states],
+	    						 checkpoint_dir=args.bert_ckpt_dir)
 
-def concatenate(lists):
-    return np.concatenate([t.cpu() for t in lists])
-
-
-def get_preds(logits):
-    return np.argmax(logits, 1)
+	def concatenate(lists):
+	    return np.concatenate([t.cpu() for t in lists])
 
 
-hidden_states = [concatenate(tensors) for tensors in evaluated_tensors]
-import pdb; pdb.set_trace()
-print()
+	def get_preds(logits):
+	    return np.argmax(logits, 1)
+
+
+	hidden_states = [concatenate(tensors) for tensors in evaluated_tensors]
+
+	import pdb; pdb.set_trace()
+	print()
+
+	# for idx in len(emb_datalayer):
+	# 	features = emb_datalayer.dataset.features
+	# 	service_id = features['service_id'][idx]
+ #        service = emb_datalayer.schemas.get_service_from_id(output["service_id"])
+ #        if service not in completed_services:
+ #            print("Generating embeddings for service %s.", service)
+ #            completed_services.add(service)
+ #        tensor_name = output["embedding_tensor_name"].decode("utf-8")
+ #        emb_mat = schema_embeddings[output["service_id"]][tensor_name]
 
 # """ Load the pretrained BERT parameters
 # See the list of pretrained models, call:
