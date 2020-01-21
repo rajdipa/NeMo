@@ -37,9 +37,7 @@ class SchemaEmbeddingDataset(Dataset):
     def __init__(self,
                  tokenizer,
                  max_seq_length,
-                 input_file,
-                 output_file,
-                 bert_model):
+                 input_file):
         """Generate the embeddings for a schema's elements.
 
         Args:
@@ -50,7 +48,6 @@ class SchemaEmbeddingDataset(Dataset):
         """
         self._tokenizer = tokenizer
         self._max_seq_length = max_seq_length
-        self._bert_model = bert_model
         self.schemas = schema.Schema(input_file)
 
         features = self._get_input_features()
@@ -73,12 +70,7 @@ class SchemaEmbeddingDataset(Dataset):
     def __getitem__(self, idx):
         return (np.array(self.features['input_ids'][idx]),
                 np.array(self.features['input_mask'][idx], dtype=np.long),
-                np.array(self.features['input_type_ids'][idx]),
-                # np.array(self.features['embedding_tensor_name'][idx]),
-                # np.array(self.features['service_id']),
-                # np.array(self.features['intent_or_slot_id']),
-                # np.array(self.features['value_id'])
-                )
+                np.array(self.features['input_type_ids'][idx]))
 
     def _create_feature(self,
                         input_line,
@@ -376,44 +368,3 @@ class InputFeatures(object):
     # The id of the value corresponding to this example. Only set if slot value
     # embeddings are being calculated.
     self.value_id = value_id
-
-
-# def input_fn_builder(features, seq_length):
-#   """Creates an `input_fn` closure to be passed to TPUEstimator."""
-
-#   all_features = collections.defaultdict(list)
-
-#   for feature in features:
-#       all_features["input_ids"].append(feature.input_ids)
-#       all_features["input_mask"].append(feature.input_mask)
-#       all_features["input_type_ids"].append(feature.input_type_ids)
-#       all_features["embedding_tensor_name"].append(feature.embedding_tensor_name)
-#       all_features["service_id"].append(feature.service_id)
-#       all_features["intent_or_slot_id"].append(feature.intent_or_slot_id)
-#       all_features["value_id"].append(feature.value_id)
-
-#   def input_fn(params):
-#     """The actual input function."""
-#     batch_size = params["batch_size"]
-#     num_examples = len(features)
-#     tensors = {}
-#     for feature_name in ["input_ids", "input_mask", "input_type_ids"]:
-#         tensors[feature_name] = tf.constant(all_features[feature_name],
-#                                             shape=[num_examples, seq_length],
-#                                             dtype=tf.int32)
-#     tensors["embedding_tensor_name"] = tf.constant(all_features["embedding_tensor_name"],
-#                                                    shape=[num_examples],
-#                                                    dtype=tf.string)
-
-#     for feature_name in ["service_id", "intent_or_slot_id", "value_id"]:
-#         tensors[feature_name] = tf.constant(all_features[feature_name],
-#                                             shape=[num_examples],
-#                                             dtype=tf.int32)
-#     # This is for demo purposes and does NOT scale to large data sets. We do
-#     # not use Dataset.from_generator() because that uses tf.py_func which is
-#     # not TPU compatible. The right way to load data is with TFRecordReader.
-#     d = tf.data.Dataset.from_tensor_slices(tensors)
-#     d = d.batch(batch_size=batch_size, drop_remainder=False)
-#     return d
-
-#   return input_fn

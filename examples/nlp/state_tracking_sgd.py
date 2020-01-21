@@ -187,14 +187,9 @@ if not os.path.exists(schema_embedding_file):
     emb_datalayer = nemo_nlp.BertInferDataLayer(dataset_type='SchemaEmbeddingDataset',
                                                 tokenizer=tokenizer,
                                                 max_seq_length=args.max_seq_length,
-                                                input_file=schema_json_path,
-                                                output_file=schema_embedding_file,
-                                                bert_model=pretrained_bert_model)
+                                                input_file=schema_json_path)
 
     print ('TO DO >>>')
-    # emb_generator.save_embeddings(schemas,
-    #                             schema_embedding_file)
-
     
     input_ids, input_mask, input_type_ids = emb_datalayer()
     hidden_states = pretrained_bert_model(input_ids=input_ids,
@@ -216,35 +211,6 @@ if not os.path.exists(schema_embedding_file):
                                           schema_embedding_file)
     nf.logger.info("Finish generating the schema embeddings.")
     
-    import pdb; pdb.set_trace()
-    # def _populate_schema_embeddings(self):
-    #     # populate schema embeddings
-    #     completed_services = set()
-    #     schema_embeddings = emb_datalayer.dataset.schema_embeddings
-    #     features = emb_datalayer.dataset.features
-    #     for idx in range(len(emb_datalayer)):
-    #         service_id = features['service_id'][idx]
-    #         service = emb_datalayer.dataset.schemas.get_service_from_id(service_id)
-
-    #         if service not in completed_services:
-    #             print("Generating embeddings for service %s.", service)
-    #             completed_services.add(service)
-    #         tensor_name = features["embedding_tensor_name"][idx]
-    #         emb_mat = schema_embeddings[service_id][tensor_name]
-
-    #         # Obtain the encoding of the [CLS] token.
-    #         embedding = [round(float(x), 6) for x in hidden_states[0][idx, 0, :].flat]
-    #         intent_or_slot_id = features['intent_or_slot_id'][idx]
-    #         value_id = features['value_id'][idx]
-
-    #         if tensor_name == "cat_slot_value_emb":
-    #             emb_mat[intent_or_slot_id, value_id] = embedding
-    #         else:
-    #             emb_mat[intent_or_slot_id] = embedding
-
-
-    # with open(schema_embedding_file, "w") as f_s:
-    #   np.save(f_s, schema_embeddings)
 
 # """ Load the pretrained BERT parameters
 # See the list of pretrained models, call:

@@ -448,31 +448,13 @@ class BertInferDataLayer(TextDataLayer):
             "input_mask": NeuralType({
                 0: AxisType(BatchTag),
                 1: AxisType(TimeTag)
-            }),
-            # "embedding_tensor_name": NeuralType({
-            # 0: AxisType(BatchTag),
-            # 1: AxisType(TimeTag)
-            # }),
-            # "service_id": NeuralType({
-            #     0: AxisType(BatchTag),
-            #     1: AxisType(TimeTag)
-            # }),
-            # "intent_or_slot_id": NeuralType({
-            #     0: AxisType(BatchTag),
-            #     1: AxisType(TimeTag)
-            # }),
-            # "value_id": NeuralType({
-            #     0: AxisType(BatchTag),
-            #     1: AxisType(TimeTag)
-            # })
+            })
           }
 
     def __init__(self,
                  tokenizer,
                  max_seq_length,
                  input_file,
-                 output_file,
-                 bert_model,
                  dataset_type,
                  batch_size=1,
                  **kwargs):
@@ -480,9 +462,7 @@ class BertInferDataLayer(TextDataLayer):
         dataset_params = {
                           'tokenizer': tokenizer,
                           'max_seq_length': max_seq_length,
-                          'input_file': input_file,
-                          'output_file': output_file,
-                          'bert_model': bert_model
+                          'input_file': input_file
                           }
         super().__init__(dataset_type, dataset_params, **kwargs)
 
