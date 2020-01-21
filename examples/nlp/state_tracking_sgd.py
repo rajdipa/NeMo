@@ -16,70 +16,70 @@ import nemo_nlp
 import nemo_nlp.data.datasets.sgd.data_utils as data_utils
 from nemo_nlp.data.datasets.sgd import tokenization
 from nemo_nlp.utils.callbacks.joint_intent_slot import \
-	eval_iter_callback, eval_epochs_done_callback
+    eval_iter_callback, eval_epochs_done_callback
 
 # Parsing arguments
 parser = argparse.ArgumentParser(description='Schema_guided_dst')
 
 # BERT based utterance encoder related arguments
 parser.add_argument("--bert_ckpt_dir", default=None, type=str,
-					required=True,
-					help="Directory containing pre-trained BERT checkpoint.")
+                    required=True,
+                    help="Directory containing pre-trained BERT checkpoint.")
 parser.add_argument("--do_lower_case", default=False, type=bool,
-				    help="Whether to lower case the input text. Should be True for uncased "
-				    "models and False for cased models.")
+                    help="Whether to lower case the input text. Should be True for uncased "
+                    "models and False for cased models.")
 parser.add_argument("--preserve_unused_tokens", default=False, type=bool,
-				    help="If preserve_unused_tokens is True, Wordpiece tokenization will not "
-				    "be applied to words in the vocab.")
+                    help="If preserve_unused_tokens is True, Wordpiece tokenization will not "
+                    "be applied to words in the vocab.")
 parser.add_argument("--max_seq_length", default=80, type=int,
-				    help="The maximum total input sequence length after WordPiece tokenization. "
-				    "Sequences longer than this will be truncated, and sequences shorter "
-				    "than this will be padded.")
+                    help="The maximum total input sequence length after WordPiece tokenization. "
+                    "Sequences longer than this will be truncated, and sequences shorter "
+                    "than this will be padded.")
 parser.add_argument("--dropout_rate", default=0.1, type=float,
                    help="Dropout rate for BERT representations.")
 
 # Hyperparameters and optimization related flags.
 parser.add_argument("--train_batch_size", default=32, type=int,
-					 help="Total batch size for training.")
+                     help="Total batch size for training.")
 parser.add_argument("--eval_batch_size", default=8, type=int,
-					 help="Total batch size for eval.")
+                     help="Total batch size for eval.")
 parser.add_argument("--predict_batch_size", default=8, type=int,
-					 help="Total batch size for predict.")
+                     help="Total batch size for predict.")
 parser.add_argument("--learning_rate", default=1e-4, type=float, 
-					 help="The initial learning rate for Adam.")
+                     help="The initial learning rate for Adam.")
 parser.add_argument("--num_train_epochs", default=80.0, type=int,
                     help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float,
-	                help="Proportion of training to perform linear learning rate warmup for. "
+                    help="Proportion of training to perform linear learning rate warmup for. "
                     "E.g., 0.1 = 10% of training.")
 parser.add_argument("--save_checkpoints_steps", default=1000, type=int,
                     help="How often to save the model checkpoint.")
 
 # Input and output paths and other flags.
 parser.add_argument("--task_name", default="dstc8_single_domain", type=str,
-				    choices=data_utils.FILE_RANGES.keys(),
+                    choices=data_utils.FILE_RANGES.keys(),
                     help="The name of the task to train.")
 
 parser.add_argument("--data_dir", type=str, required=True,
-				    help="Directory for the downloaded DSTC8 data, which contains the dialogue files"
-				    " and schema files of all datasets (eg train, dev)")
+                    help="Directory for the downloaded DSTC8 data, which contains the dialogue files"
+                    " and schema files of all datasets (eg train, dev)")
 
 parser.add_argument("--run_mode", default="train", type=str,
-					choices=["train", "predict"],
+                    choices=["train", "predict"],
                     help="The mode to run the script in.")
 
 parser.add_argument("--work_dir", type=str, required=True,
                     help="The output directory where the model checkpoints will be written.")
 
 parser.add_argument("--schema_embedding_dir", type=str, required=True,
-    				help="Directory where .npy file for embedding of entities (slots, values,"
-       				" intents) in the dataset_split's schema are stored.")
+                    help="Directory where .npy file for embedding of entities (slots, values,"
+                    " intents) in the dataset_split's schema are stored.")
 
 parser.add_argument("--dialogues_example_dir", type=str, required=True,
-    				help="Directory where tf.record of DSTC8 dialogues data are stored.")
+                    help="Directory where tf.record of DSTC8 dialogues data are stored.")
 
 parser.add_argument("--dataset_split", type=str, required=True,
-					choices=["train", "dev", "test"],
+                    choices=["train", "dev", "test"],
                     help="Dataset split for training / prediction.")
 
 parser.add_argument("--local_rank", default=None, type=int)
@@ -116,12 +116,12 @@ if not os.path.exists(vocab_file):
 
 work_dir = f'{args.work_dir}/{args.task_name.upper()}'
 nf = nemo.core.NeuralModuleFactory(backend=nemo.core.Backend.PyTorch,
-								   local_rank=args.local_rank,
-								   optimization_level=args.amp_opt_level,
-								   log_dir=work_dir,
-								   create_tb_writer=True,
-								   files_to_copy=[__file__],
-								   add_time_to_log_dir=True)
+                                   local_rank=args.local_rank,
+                                   optimization_level=args.amp_opt_level,
+                                   log_dir=work_dir,
+                                   create_tb_writer=True,
+                                   files_to_copy=[__file__],
+                                   add_time_to_log_dir=True)
 
 processor = data_utils.Dstc8DataProcessor(
       args.data_dir,
@@ -141,15 +141,15 @@ dial_file = os.path.join(args.dialogues_example_dir, dial_file_name)
 if not os.path.exists(args.dialogues_example_dir):
     os.makedirs(args.dialogues_example_dir)
 if not os.path.exists(dial_file):
-	nf.logger.info("Start generating the dialogue examples.")
-	data_utils._create_dialog_examples(processor, dial_file, args.dataset_split)
-	nf.logger.info("Finish generating the dialogue examples.")
+    nf.logger.info("Start generating the dialogue examples.")
+    data_utils._create_dialog_examples(processor, dial_file, args.dataset_split)
+    nf.logger.info("Finish generating the dialogue examples.")
 
 # Generate the schema embeddings if needed or specified.
 bert_init_ckpt = os.path.join(args.bert_ckpt_dir, "bert_model.ckpt")
 
 pretrained_bert_model = nemo_nlp.huggingface.BERT(
-	pretrained_model_name="bert-base-cased", factory=nf)
+    pretrained_model_name="bert-base-cased", factory=nf)
 # hidden_size = pretrained_bert_model.local_parameters["hidden_size"]
 
 tokenization.validate_case_matches_checkpoint(
@@ -169,202 +169,218 @@ if not os.path.exists(bert_config):
     raise ValueError(f'bert_config.json not found at {args.bert_ckpt_dir}')
 
 schema_embedding_file = os.path.join(args.schema_embedding_dir,
-	"{}_pretrained_schema_embedding.npy".format(args.dataset_split))
+    "{}_pretrained_schema_embedding.npy".format(args.dataset_split))
 
 if not os.path.exists(schema_embedding_file):
-	nf.logger.info("Start generating the schema embeddings.")
-	# create schema embedding if no file exists
-	# TODO move to DataDescription
-	schema_json_path = os.path.join(args.data_dir, 
-									args.dataset_split,
-									"schema.json")
+    nf.logger.info("Start generating the schema embeddings.")
+    # create schema embedding if no file exists
+    # TODO move to DataDescription
+    schema_json_path = os.path.join(args.data_dir, 
+                                    args.dataset_split,
+                                    "schema.json")
 
-	vocab_file = os.path.join(args.bert_ckpt_dir, "vocab.txt")
-	tokenizer = tokenization.FullTokenizer(vocab_file=vocab_file,
-										   do_lower_case=args.do_lower_case,
-										   preserve_unused_tokens=args.preserve_unused_tokens)
+    vocab_file = os.path.join(args.bert_ckpt_dir, "vocab.txt")
+    tokenizer = tokenization.FullTokenizer(vocab_file=vocab_file,
+                                           do_lower_case=args.do_lower_case,
+                                           preserve_unused_tokens=args.preserve_unused_tokens)
 
-	emb_datalayer = nemo_nlp.BertInferDataLayer(dataset_type='SchemaEmbeddingDataset',
-												tokenizer=tokenizer,
-									   			max_seq_length=args.max_seq_length,
-									   			input_file=schema_json_path,
-									   			output_file=schema_embedding_file,
-									   			bert_model=pretrained_bert_model)
+    emb_datalayer = nemo_nlp.BertInferDataLayer(dataset_type='SchemaEmbeddingDataset',
+                                                tokenizer=tokenizer,
+                                                max_seq_length=args.max_seq_length,
+                                                input_file=schema_json_path,
+                                                output_file=schema_embedding_file,
+                                                bert_model=pretrained_bert_model)
 
-	print ('TO DO >>>')
-	# emb_generator.save_embeddings(schemas,
-	# 							  schema_embedding_file)
+    print ('TO DO >>>')
+    # emb_generator.save_embeddings(schemas,
+    #                             schema_embedding_file)
 
-	nf.logger.info("Finish generating the schema embeddings.")
+    
+    input_ids, input_mask, input_type_ids = emb_datalayer()
+    hidden_states = pretrained_bert_model(input_ids=input_ids,
+                                          token_type_ids=input_type_ids,
+                                          attention_mask=input_mask)
 
-	input_ids, input_mask, input_type_ids = emb_datalayer()
+    evaluated_tensors = nf.infer(tensors=[hidden_states],
+                                 checkpoint_dir=args.bert_ckpt_dir)
 
-	schema_embeddings = emb_datalayer.dataset.schema_embeddings
-	hidden_states = pretrained_bert_model(input_ids=input_ids,
-			                              token_type_ids=input_type_ids,
-			                              attention_mask=input_mask)
-
-	evaluated_tensors = nf.infer(tensors=[hidden_states],
-	    						 checkpoint_dir=args.bert_ckpt_dir)
-
-	def concatenate(lists):
-	    return np.concatenate([t.cpu() for t in lists])
+    def concatenate(lists):
+        return np.concatenate([t.cpu() for t in lists])
 
 
-	def get_preds(logits):
-	    return np.argmax(logits, 1)
+    def get_preds(logits):
+        return np.argmax(logits, 1)
+
+    hidden_states = [concatenate(tensors) for tensors in evaluated_tensors]
+    emb_datalayer.dataset.save_embeddings(hidden_states,
+                                          schema_embedding_file)
+    nf.logger.info("Finish generating the schema embeddings.")
+    
+    import pdb; pdb.set_trace()
+    # def _populate_schema_embeddings(self):
+    #     # populate schema embeddings
+    #     completed_services = set()
+    #     schema_embeddings = emb_datalayer.dataset.schema_embeddings
+    #     features = emb_datalayer.dataset.features
+    #     for idx in range(len(emb_datalayer)):
+    #         service_id = features['service_id'][idx]
+    #         service = emb_datalayer.dataset.schemas.get_service_from_id(service_id)
+
+    #         if service not in completed_services:
+    #             print("Generating embeddings for service %s.", service)
+    #             completed_services.add(service)
+    #         tensor_name = features["embedding_tensor_name"][idx]
+    #         emb_mat = schema_embeddings[service_id][tensor_name]
+
+    #         # Obtain the encoding of the [CLS] token.
+    #         embedding = [round(float(x), 6) for x in hidden_states[0][idx, 0, :].flat]
+    #         intent_or_slot_id = features['intent_or_slot_id'][idx]
+    #         value_id = features['value_id'][idx]
+
+    #         if tensor_name == "cat_slot_value_emb":
+    #             emb_mat[intent_or_slot_id, value_id] = embedding
+    #         else:
+    #             emb_mat[intent_or_slot_id] = embedding
 
 
-	hidden_states = [concatenate(tensors) for tensors in evaluated_tensors]
-
-	import pdb; pdb.set_trace()
-	print()
-
-	# for idx in len(emb_datalayer):
-	# 	features = emb_datalayer.dataset.features
-	# 	service_id = features['service_id'][idx]
- #        service = emb_datalayer.schemas.get_service_from_id(output["service_id"])
- #        if service not in completed_services:
- #            print("Generating embeddings for service %s.", service)
- #            completed_services.add(service)
- #        tensor_name = output["embedding_tensor_name"].decode("utf-8")
- #        emb_mat = schema_embeddings[output["service_id"]][tensor_name]
+    # with open(schema_embedding_file, "w") as f_s:
+    #   np.save(f_s, schema_embeddings)
 
 # """ Load the pretrained BERT parameters
 # See the list of pretrained models, call:
 # nemo_nlp.huggingface.BERT.list_pretrained_models()
 # """
 # pretrained_bert_model = nemo_nlp.huggingface.BERT(
-# 	pretrained_model_name=args.pretrained_bert_model, factory=nf)
+#   pretrained_model_name=args.pretrained_bert_model, factory=nf)
 # hidden_size = pretrained_bert_model.local_parameters["hidden_size"]
 # tokenizer = BertTokenizer.from_pretrained(args.pretrained_bert_model)
 
 # task_name = args.task_name.lower()
 # if task_name not in sgd_utils.FILE_RANGES:
-# 	raise ValueError(f'Task not found: {task_name}')
+#   raise ValueError(f'Task not found: {task_name}')
 
 # data_desc = SGDDataset(args.data_dir,
-# 									 tokenizer,
-# 									 task_name=task_name,
-# 									 dataset_split=args.dataset_split,
-# 									 do_lower_case=args.do_lower_case,
-# 									 dataset_name=args.dataset_name,
-# 									 none_slot_label=args.none_slot_label,
-# 									 pad_label=args.pad_label,
-# 									 max_seq_length=args.max_seq_length)
+#                                    tokenizer,
+#                                    task_name=task_name,
+#                                    dataset_split=args.dataset_split,
+#                                    do_lower_case=args.do_lower_case,
+#                                    dataset_name=args.dataset_name,
+#                                    none_slot_label=args.none_slot_label,
+#                                    pad_label=args.pad_label,
+#                                    max_seq_length=args.max_seq_length)
 
 # # Create sentence classification loss on top
 # classifier = nemo_nlp.JointIntentSlotClassifier(
-# 	hidden_size=hidden_size,
-# 	num_intents=data_desc.num_intents,
-# 	num_slots=data_desc.num_slots,
-# 	dropout=args.fc_dropout)
+#   hidden_size=hidden_size,
+#   num_intents=data_desc.num_intents,
+#   num_slots=data_desc.num_slots,
+#   dropout=args.fc_dropout)
 
 # loss_fn = nemo_nlp.JointIntentSlotLoss(num_slots=data_desc.num_slots)
 
 
 # def create_pipeline(num_samples=-1,
-# 					batch_size=32,
-# 					num_gpus=1,
-# 					local_rank=0,
-# 					mode='train'):
-# 	nf.logger.info(f"Loading {mode} data...")
-# 	data_file = f'{data_desc.data_dir}/{mode}.tsv'
-# 	slot_file = f'{data_desc.data_dir}/{mode}_slots.tsv'
-# 	shuffle = args.shuffle_data if mode == 'train' else False
+#                   batch_size=32,
+#                   num_gpus=1,
+#                   local_rank=0,
+#                   mode='train'):
+#   nf.logger.info(f"Loading {mode} data...")
+#   data_file = f'{data_desc.data_dir}/{mode}.tsv'
+#   slot_file = f'{data_desc.data_dir}/{mode}_slots.tsv'
+#   shuffle = args.shuffle_data if mode == 'train' else False
 
-# 	data_layer = nemo_nlp.BertJointIntentSlotDataLayer(
-# 		input_file=data_file,
-# 		slot_file=slot_file,
-# 		pad_label=data_desc.pad_label,
-# 		tokenizer=tokenizer,
-# 		max_seq_length=args.max_seq_length,
-# 		num_samples=num_samples,
-# 		shuffle=shuffle,
-# 		batch_size=batch_size,
-# 		num_workers=0,
-# 		local_rank=local_rank,
-# 		ignore_extra_tokens=args.ignore_extra_tokens,
-# 		ignore_start_end=args.ignore_start_end
-# 	)
+#   data_layer = nemo_nlp.BertJointIntentSlotDataLayer(
+#       input_file=data_file,
+#       slot_file=slot_file,
+#       pad_label=data_desc.pad_label,
+#       tokenizer=tokenizer,
+#       max_seq_length=args.max_seq_length,
+#       num_samples=num_samples,
+#       shuffle=shuffle,
+#       batch_size=batch_size,
+#       num_workers=0,
+#       local_rank=local_rank,
+#       ignore_extra_tokens=args.ignore_extra_tokens,
+#       ignore_start_end=args.ignore_start_end
+#   )
 
-# 	ids, type_ids, input_mask, loss_mask, \
-# 	subtokens_mask, intents, slots = data_layer()
-# 	data_size = len(data_layer)
+#   ids, type_ids, input_mask, loss_mask, \
+#   subtokens_mask, intents, slots = data_layer()
+#   data_size = len(data_layer)
 
-# 	if data_size < batch_size:
-# 		nf.logger.warning("Batch_size is larger than the dataset size")
-# 		nf.logger.warning("Reducing batch_size to dataset size")
-# 		batch_size = data_size
+#   if data_size < batch_size:
+#       nf.logger.warning("Batch_size is larger than the dataset size")
+#       nf.logger.warning("Reducing batch_size to dataset size")
+#       batch_size = data_size
 
-# 	steps_per_epoch = math.ceil(data_size / (batch_size * num_gpus))
-# 	nf.logger.info(f"Steps_per_epoch = {steps_per_epoch}")
+#   steps_per_epoch = math.ceil(data_size / (batch_size * num_gpus))
+#   nf.logger.info(f"Steps_per_epoch = {steps_per_epoch}")
 
-# 	hidden_states = pretrained_bert_model(input_ids=ids,
-# 										  token_type_ids=type_ids,
-# 										  attention_mask=input_mask)
+#   hidden_states = pretrained_bert_model(input_ids=ids,
+#                                         token_type_ids=type_ids,
+#                                         attention_mask=input_mask)
 
-# 	intent_logits, slot_logits = classifier(hidden_states=hidden_states)
+#   intent_logits, slot_logits = classifier(hidden_states=hidden_states)
 
-# 	loss = loss_fn(intent_logits=intent_logits,
-# 				   slot_logits=slot_logits,
-# 				   loss_mask=loss_mask,
-# 				   intents=intents,
-# 				   slots=slots)
+#   loss = loss_fn(intent_logits=intent_logits,
+#                  slot_logits=slot_logits,
+#                  loss_mask=loss_mask,
+#                  intents=intents,
+#                  slots=slots)
 
-# 	if mode == 'train':
-# 		tensors_to_evaluate = [loss, intent_logits, slot_logits]
-# 	else:
-# 		tensors_to_evaluate = [intent_logits, slot_logits, intents,
-# 							   slots, subtokens_mask]
+#   if mode == 'train':
+#       tensors_to_evaluate = [loss, intent_logits, slot_logits]
+#   else:
+#       tensors_to_evaluate = [intent_logits, slot_logits, intents,
+#                              slots, subtokens_mask]
 
-# 	return tensors_to_evaluate, loss, steps_per_epoch, data_layer
+#   return tensors_to_evaluate, loss, steps_per_epoch, data_layer
 
 
 # train_tensors, train_loss, steps_per_epoch, _ = create_pipeline(
-# 	args.num_train_samples,
-# 	batch_size=args.batch_size,
-# 	num_gpus=args.num_gpus,
-# 	local_rank=args.local_rank,
-# 	mode=args.train_file_prefix)
+#   args.num_train_samples,
+#   batch_size=args.batch_size,
+#   num_gpus=args.num_gpus,
+#   local_rank=args.local_rank,
+#   mode=args.train_file_prefix)
 # eval_tensors, _, _, data_layer = create_pipeline(
-# 	args.num_eval_samples,
-# 	batch_size=args.batch_size,
-# 	num_gpus=args.num_gpus,
-# 	local_rank=args.local_rank,
-# 	mode=args.eval_file_prefix)
+#   args.num_eval_samples,
+#   batch_size=args.batch_size,
+#   num_gpus=args.num_gpus,
+#   local_rank=args.local_rank,
+#   mode=args.eval_file_prefix)
 
 # # Create callbacks for train and eval modes
 # train_callback = nemo.core.SimpleLossLoggerCallback(
-# 	tensors=train_tensors,
-# 	print_func=lambda x: str(np.round(x[0].item(), 3)),
-# 	tb_writer=nf.tb_writer,
-# 	get_tb_values=lambda x: [["loss", x[0]]],
-# 	step_freq=steps_per_epoch)
+#   tensors=train_tensors,
+#   print_func=lambda x: str(np.round(x[0].item(), 3)),
+#   tb_writer=nf.tb_writer,
+#   get_tb_values=lambda x: [["loss", x[0]]],
+#   step_freq=steps_per_epoch)
 
 # eval_callback = nemo.core.EvaluatorCallback(
-# 	eval_tensors=eval_tensors,
-# 	user_iter_callback=lambda x, y: eval_iter_callback(
-# 		x, y, data_layer),
-# 	user_epochs_done_callback=lambda x: eval_epochs_done_callback(
-# 		x, f'{nf.work_dir}/graphs'),
-# 	tb_writer=nf.tb_writer,
-# 	eval_step=steps_per_epoch)
+#   eval_tensors=eval_tensors,
+#   user_iter_callback=lambda x, y: eval_iter_callback(
+#       x, y, data_layer),
+#   user_epochs_done_callback=lambda x: eval_epochs_done_callback(
+#       x, f'{nf.work_dir}/graphs'),
+#   tb_writer=nf.tb_writer,
+#   eval_step=steps_per_epoch)
 
 # # Create callback to save checkpoints
 # ckpt_callback = nemo.core.CheckpointCallback(
-# 	folder=nf.checkpoint_dir,
-# 	epoch_freq=args.save_epoch_freq,
-# 	step_freq=args.save_step_freq)
+#   folder=nf.checkpoint_dir,
+#   epoch_freq=args.save_epoch_freq,
+#   step_freq=args.save_step_freq)
 
 # lr_policy_fn = get_lr_policy(args.lr_policy,
-# 							 total_steps=args.num_epochs * steps_per_epoch,
-# 							 warmup_ratio=args.lr_warmup_proportion)
+#                            total_steps=args.num_epochs * steps_per_epoch,
+#                            warmup_ratio=args.lr_warmup_proportion)
 
 # nf.train(tensors_to_optimize=[train_loss],
-# 		 callbacks=[train_callback, eval_callback, ckpt_callback],
-# 		 lr_policy=lr_policy_fn,
-# 		 optimizer=args.optimizer_kind,
-# 		 optimization_params={"num_epochs": args.num_epochs,
-# 							  "lr": args.lr,
-# 							  "weight_decay": args.weight_decay})
+#        callbacks=[train_callback, eval_callback, ckpt_callback],
+#        lr_policy=lr_policy_fn,
+#        optimizer=args.optimizer_kind,
+#        optimization_params={"num_epochs": args.num_epochs,
+#                             "lr": args.lr,
+#                             "weight_decay": args.weight_decay})

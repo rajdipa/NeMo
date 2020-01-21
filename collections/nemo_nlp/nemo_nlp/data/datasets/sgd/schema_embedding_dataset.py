@@ -48,31 +48,10 @@ class SchemaEmbeddingDataset(Dataset):
           max_seq_length: Sequence length used for BERT model.
           input_file: path to json schema
         """
-        # self.features = features
-
         self._tokenizer = tokenizer
         self._max_seq_length = max_seq_length
         self._bert_model = bert_model
         self.schemas = schema.Schema(input_file)
-
-        """Generate schema element embeddings and save it as a numpy file."""
-        self.schema_embeddings = []
-        max_num_intent = data_utils.MAX_NUM_INTENT
-        max_num_cat_slot = data_utils.MAX_NUM_CAT_SLOT
-        max_num_noncat_slot = data_utils.MAX_NUM_NONCAT_SLOT
-        max_num_slot = max_num_cat_slot + max_num_noncat_slot
-        max_num_value = data_utils.MAX_NUM_VALUE_PER_CAT_SLOT
-        embedding_dim = data_utils.EMBEDDING_DIMENSION
-
-        for _ in self.schemas.services:
-            self.schema_embeddings.append({
-              "intent_emb": np.zeros([max_num_intent, embedding_dim]),
-              "req_slot_emb": np.zeros([max_num_slot, embedding_dim]),
-              "cat_slot_emb": np.zeros([max_num_cat_slot, embedding_dim]),
-              "noncat_slot_emb": np.zeros([max_num_noncat_slot, embedding_dim]),
-              "cat_slot_value_emb":
-                  np.zeros([max_num_cat_slot, max_num_value, embedding_dim]),
-          })
 
         features = self._get_input_features()
 
@@ -88,28 +67,6 @@ class SchemaEmbeddingDataset(Dataset):
             all_features["value_id"].append(feature.value_id)
         self.features = all_features
 
-  # def input_fn(params):
-  #     """The actual input function."""
-  #     batch_size = params["batch_size"]
-  #     num_examples = len(features)
-  #     tensors = {}
-  #     for feature_name in ["input_ids", "input_mask", "input_type_ids"]:
-  #       tensors[feature_name] = tf.constant(
-  #           all_features[feature_name], shape=[num_examples, seq_length],
-  #           dtype=tf.int32)
-  #     tensors["embedding_tensor_name"] = tf.constant(
-  #         all_features["embedding_tensor_name"], shape=[num_examples],
-  #         dtype=tf.string)
-  #     for feature_name in ["service_id", "intent_or_slot_id", "value_id"]:
-  #       tensors[feature_name] = tf.constant(
-  #           all_features[feature_name], shape=[num_examples], dtype=tf.int32)
-  #     # This is for demo purposes and does NOT scale to large data sets. We do
-  #     # not use Dataset.from_generator() because that uses tf.py_func which is
-  #     # not TPU compatible. The right way to load data is with TFRecordReader.
-  #     d = tf.data.Dataset.from_tensor_slices(tensors)
-  #     d = d.batch(batch_size=batch_size, drop_remainder=False)
-  #     return d
-
     def __len__(self):
         return len(self.features['input_ids'])
 
@@ -122,9 +79,6 @@ class SchemaEmbeddingDataset(Dataset):
                 # np.array(self.features['intent_or_slot_id']),
                 # np.array(self.features['value_id'])
                 )
-
-
-  
 
     def _create_feature(self,
                         input_line,
@@ -338,58 +292,62 @@ class SchemaEmbeddingDataset(Dataset):
         # return input_fn
         return features
 
-    # def _populate_schema_embeddings(self, schemas, schema_embeddings):
-    #     """Run the BERT estimator and populate all schema embeddings."""
-    #     input_fn = self._get_input_fn(schemas)
-    #     completed_services = set()
-    #     import pdb; pdb.set_trace()
+    def _populate_schema_embeddings(self,
+                                    schema_embeddings,
+                                    hidden_states):
+        """
+        Populate all schema embeddings with BERT embeddings.
+        """
+        completed_services = set()
+        
+        for idx in range(len(self)):
+            service_id = self.features['service_id'][idx]
+            service = self.schemas.get_service_from_id(service_id)
 
-    #     # example
-    #     example = input_fn[0]
-    #     input_ids = example.input_ids
-    #     input_mask = example.input_mask
-    #     input_type_ids = example.input_type_ids
+            if service not in completed_services:
+                print("Generating embeddings for service %s.", service)
+                completed_services.add(service)
+            tensor_name = self.features["embedding_tensor_name"][idx]
+            emb_mat = schema_embeddings[service_id][tensor_name]
 
-    #     hidden_states = self._estimator(input_ids=input_ids,
-    #                                     token_type_ids=input_type_ids,
-    #                                     attention_mask=input_mask)
+            # Obtain the encoding of the [CLS] token.
+            embedding = [round(float(x), 6) for x in hidden_states[0][idx, 0, :].flat]
+            intent_or_slot_id = self.features['intent_or_slot_id'][idx]
+            value_id = self.features['value_id'][idx]
 
-    #     for output in self._estimator.predict(input_fn, yield_single_examples=True):
-    #         service = schemas.get_service_from_id(output["service_id"])
-    #         if service not in completed_services:
-    #             print("Generating embeddings for service %s.", service)
-    #             completed_services.add(service)
-    #         tensor_name = output["embedding_tensor_name"].decode("utf-8")
-    #         emb_mat = schema_embeddings[output["service_id"]][tensor_name]
-    #         # Obtain the encoding of the [CLS] token.
-    #         embedding = [round(float(x), 6) for x in output["final_layer"][0].flat]
-    #         if tensor_name == "cat_slot_value_emb":
-    #             emb_mat[output["intent_or_slot_id"], output["value_id"]] = embedding
-    #         else:
-    #             emb_mat[output["intent_or_slot_id"]] = embedding
+            if tensor_name == "cat_slot_value_emb":
+                emb_mat[intent_or_slot_id, value_id] = embedding
+            else:
+                emb_mat[intent_or_slot_id] = embedding
 
-    # def save_embeddings(self, schemas, output_file):
-    #     """Generate schema element embeddings and save it as a numpy file."""
-    #     schema_embs = []
-    #     max_num_intent = data_utils.MAX_NUM_INTENT
-    #     max_num_cat_slot = data_utils.MAX_NUM_CAT_SLOT
-    #     max_num_noncat_slot = data_utils.MAX_NUM_NONCAT_SLOT
-    #     max_num_slot = max_num_cat_slot + max_num_noncat_slot
-    #     max_num_value = data_utils.MAX_NUM_VALUE_PER_CAT_SLOT
-    #     embedding_dim = data_utils.EMBEDDING_DIMENSION
-    #     for _ in schemas.services:
-    #         schema_embs.append({
-    #           "intent_emb": np.zeros([max_num_intent, embedding_dim]), # 4 * 768
-    #           "req_slot_emb": np.zeros([max_num_slot, embedding_dim]), # 18 * 768
-    #           "cat_slot_emb": np.zeros([max_num_cat_slot, embedding_dim]), # 6 * 768
-    #           "noncat_slot_emb": np.zeros([max_num_noncat_slot, embedding_dim]), # 12 * 768
-    #           "cat_slot_value_emb": # 6 * 11 * 768
-    #               np.zeros([max_num_cat_slot, max_num_value, embedding_dim]),
-    #       })
-    #     # Populate the embeddings based on bert inference results and save them.
-    #     self._populate_schema_embeddings(schemas, schema_embs)
-    #     with open(output_file, "w") as f_s:
-    #         np.save(f_s, schema_embs)
+
+    def save_embeddings(self,
+                        bert_hidden_states,
+                        output_file):
+        """Generate schema element embeddings and save it as a numpy file."""
+        schema_embeddings = []
+        max_num_intent = data_utils.MAX_NUM_INTENT
+        max_num_cat_slot = data_utils.MAX_NUM_CAT_SLOT
+        max_num_noncat_slot = data_utils.MAX_NUM_NONCAT_SLOT
+        max_num_slot = max_num_cat_slot + max_num_noncat_slot
+        max_num_value = data_utils.MAX_NUM_VALUE_PER_CAT_SLOT
+        embedding_dim = data_utils.EMBEDDING_DIMENSION
+
+        for _ in self.schemas.services:
+            schema_embeddings.append({
+              "intent_emb": np.zeros([max_num_intent, embedding_dim]),
+              "req_slot_emb": np.zeros([max_num_slot, embedding_dim]),
+              "cat_slot_emb": np.zeros([max_num_cat_slot, embedding_dim]),
+              "noncat_slot_emb": np.zeros([max_num_noncat_slot, embedding_dim]),
+              "cat_slot_value_emb":
+                  np.zeros([max_num_cat_slot, max_num_value, embedding_dim]),
+          })
+
+        # Populate the embeddings based on bert inference results and save them.
+        self._populate_schema_embeddings(schema_embeddings,
+                                         bert_hidden_states)
+        with open(output_file, "wb") as f_s:
+            np.save(f_s, schema_embeddings)
 
 class InputFeatures(object):
   """A single set of features for BERT inference."""
@@ -420,96 +378,42 @@ class InputFeatures(object):
     self.value_id = value_id
 
 
-def input_fn_builder(features, seq_length):
-  """Creates an `input_fn` closure to be passed to TPUEstimator."""
+# def input_fn_builder(features, seq_length):
+#   """Creates an `input_fn` closure to be passed to TPUEstimator."""
 
-  all_features = collections.defaultdict(list)
+#   all_features = collections.defaultdict(list)
 
-  for feature in features:
-      all_features["input_ids"].append(feature.input_ids)
-      all_features["input_mask"].append(feature.input_mask)
-      all_features["input_type_ids"].append(feature.input_type_ids)
-      all_features["embedding_tensor_name"].append(feature.embedding_tensor_name)
-      all_features["service_id"].append(feature.service_id)
-      all_features["intent_or_slot_id"].append(feature.intent_or_slot_id)
-      all_features["value_id"].append(feature.value_id)
+#   for feature in features:
+#       all_features["input_ids"].append(feature.input_ids)
+#       all_features["input_mask"].append(feature.input_mask)
+#       all_features["input_type_ids"].append(feature.input_type_ids)
+#       all_features["embedding_tensor_name"].append(feature.embedding_tensor_name)
+#       all_features["service_id"].append(feature.service_id)
+#       all_features["intent_or_slot_id"].append(feature.intent_or_slot_id)
+#       all_features["value_id"].append(feature.value_id)
 
-  def input_fn(params):
-    """The actual input function."""
-    batch_size = params["batch_size"]
-    num_examples = len(features)
-    tensors = {}
-    for feature_name in ["input_ids", "input_mask", "input_type_ids"]:
-        tensors[feature_name] = tf.constant(all_features[feature_name],
-                                            shape=[num_examples, seq_length],
-                                            dtype=tf.int32)
-    tensors["embedding_tensor_name"] = tf.constant(all_features["embedding_tensor_name"],
-                                                   shape=[num_examples],
-                                                   dtype=tf.string)
+#   def input_fn(params):
+#     """The actual input function."""
+#     batch_size = params["batch_size"]
+#     num_examples = len(features)
+#     tensors = {}
+#     for feature_name in ["input_ids", "input_mask", "input_type_ids"]:
+#         tensors[feature_name] = tf.constant(all_features[feature_name],
+#                                             shape=[num_examples, seq_length],
+#                                             dtype=tf.int32)
+#     tensors["embedding_tensor_name"] = tf.constant(all_features["embedding_tensor_name"],
+#                                                    shape=[num_examples],
+#                                                    dtype=tf.string)
 
-    for feature_name in ["service_id", "intent_or_slot_id", "value_id"]:
-        tensors[feature_name] = tf.constant(all_features[feature_name],
-                                            shape=[num_examples],
-                                            dtype=tf.int32)
-    # This is for demo purposes and does NOT scale to large data sets. We do
-    # not use Dataset.from_generator() because that uses tf.py_func which is
-    # not TPU compatible. The right way to load data is with TFRecordReader.
-    d = tf.data.Dataset.from_tensor_slices(tensors)
-    d = d.batch(batch_size=batch_size, drop_remainder=False)
-    return d
+#     for feature_name in ["service_id", "intent_or_slot_id", "value_id"]:
+#         tensors[feature_name] = tf.constant(all_features[feature_name],
+#                                             shape=[num_examples],
+#                                             dtype=tf.int32)
+#     # This is for demo purposes and does NOT scale to large data sets. We do
+#     # not use Dataset.from_generator() because that uses tf.py_func which is
+#     # not TPU compatible. The right way to load data is with TFRecordReader.
+#     d = tf.data.Dataset.from_tensor_slices(tensors)
+#     d = d.batch(batch_size=batch_size, drop_remainder=False)
+#     return d
 
-  return input_fn
-
-
-# def model_fn_builder(bert_model,
-#                      use_one_hot_embeddings):
-#   """ TODO """
-
-#   def model_fn(features, labels, params, model):  # pylint: disable=unused-argument
-#     input_ids = features["input_ids"]
-#     input_mask = features["input_mask"]
-#     input_type_ids = features["input_type_ids"]
-
-#     model = modeling.BertModel(
-#         config=bert_config,
-#         is_training=False,
-#         input_ids=input_ids,
-#         input_mask=input_mask,
-#         token_type_ids=input_type_ids,
-#         use_one_hot_embeddings=use_one_hot_embeddings)
-
-#     if mode != tf.estimator.ModeKeys.PREDICT:
-#       raise ValueError("Only PREDICT modes are supported: %s" % (mode))
-
-#     tvars = tf.trainable_variables()
-#     scaffold_fn = None
-#     assignment_map, _ = modeling.get_assignment_map_from_checkpoint(
-#         tvars, init_checkpoint)
-
-#     if use_tpu:
-#       def tpu_scaffold():
-#         tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
-#         return tf.train.Scaffold()
-
-#       scaffold_fn = tpu_scaffold
-#     else:
-#       tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
-
-#     all_layers = model.get_all_encoder_layers()
-
-#     predictions = {}
-#     # Add input features containing identity of the input sequence.
-#     for feature in ["embedding_tensor_name", "service_id", "intent_or_slot_id",
-#                     "value_id"]:
-#       predictions[feature] = features[feature]
-
-#     # Use the embedding obtained from the final layer.
-#     predictions["final_layer"] = all_layers[-1]
-
-#     output_spec = tf.contrib.tpu.TPUEstimatorSpec(
-#         mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
-#     return output_spec
-
-#   return model_fn
-
-
+#   return input_fn
