@@ -18,8 +18,7 @@ __all__ = ['TextDataLayer',
            'BertPretrainingPreprocessedDataLayer',
            'TranslationDataLayer',
            'GlueDataLayerClassification',
-           'GlueDataLayerRegression',
-           # 'SchemaGuidedDialogueDatalayer',
+           'GlueDataLayerRegression'
            ]
 
 # from abc import abstractmethod

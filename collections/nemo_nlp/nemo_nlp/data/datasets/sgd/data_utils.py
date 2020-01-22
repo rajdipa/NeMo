@@ -29,9 +29,7 @@ import re
 import collections
 
 from nemo.utils.exp_logging import get_logger
-from nemo_nlp.data.datasets.sgd import tokenization
-
-from . import schema
+from nemo_nlp.data.datasets.sgd import tokenization, schema
 
 # Dimension of the embedding for intents, slots and categorical slot values in
 # the schema. Should be equal to BERT's hidden_size.
@@ -89,7 +87,7 @@ class Dstc8DataProcessor(object):
                  test_file_range,
                  vocab_file,
                  do_lower_case,
-                 preserve_unused_tokens,
+                 tokenizer,
                  max_seq_length=DEFAULT_MAX_SEQ_LENGTH,
                  log_data_warnings=False):
 	    self.dstc8_data_dir = dstc8_data_dir
@@ -99,11 +97,8 @@ class Dstc8DataProcessor(object):
 	        "dev": dev_file_range,
 	        "test": test_file_range,
 	    }
-	    # BERT tokenizer
-	    self._tokenizer = tokenization.FullTokenizer(
-	        vocab_file=vocab_file,
-	        do_lower_case=do_lower_case,
-	        preserve_unused_tokens=preserve_unused_tokens)
+	    
+	    self._tokenizer = tokenizer
 	    self._max_seq_length = max_seq_length
 
 	def get_dialog_examples(self, dataset):
@@ -164,9 +159,14 @@ class Dstc8DataProcessor(object):
 				state_update.pop(slot)
 		return state_update
 
-	def _create_examples_from_turn(self, turn_id, system_utterance,
-								   user_utterance, system_frames, user_frames,
-								   prev_states, schemas):
+	def _create_examples_from_turn(self,
+								   turn_id,
+								   system_utterance,
+								   user_utterance,
+								   system_frames,
+								   user_frames,
+								   prev_states,
+								   schemas):
 		"""Creates an example for each frame in the user turn."""
 		system_tokens, system_alignments, system_inv_alignments = (
 			self._tokenize(system_utterance))
@@ -179,8 +179,10 @@ class Dstc8DataProcessor(object):
 			tokenizer=self._tokenizer,
 			log_data_warnings=self._log_data_warnings)
 		base_example.example_id = turn_id
-		base_example.add_utterance_features(system_tokens, system_inv_alignments,
-											user_tokens, user_inv_alignments)
+		base_example.add_utterance_features(system_tokens,
+											system_inv_alignments,
+											user_tokens,
+											user_inv_alignments)
 		examples = []
 		for service, user_frame in user_frames.items():
 			# Create an example for this service.
@@ -253,8 +255,7 @@ class Dstc8DataProcessor(object):
 			during inference to map word-piece indices to spans in the original
 			utterance.
 		"""
-		# TODO: check this out
-		# utterance = tokenization.convert_to_unicode(utterance)
+		utterance = tokenization.convert_to_unicode(utterance)
 
 		# After _naive_tokenize, spaces and punctuation marks are all retained, i.e.
 		# direct concatenation of all the tokens in the sequence will be the
@@ -642,70 +643,6 @@ def _naive_tokenize(s):
 	# of all the tokens in the sequence will be the original string.
 	seq_tok = [tok for tok in re.split(r"([^a-zA-Z0-9])", s) if tok]
 	return seq_tok
-
-
-# def process_sgd(infold,
-# 				uncased,
-# 				dataset_name,
-# 				task_name,
-# 				tokenizer,
-# 				encoder,
-# 				dataset_split,
-# 				max_seq_length,
-# 				modes,
-# 				log_data_warnings):
-# 	""" process and convert SGD dataset into CSV files
-# 	"""
-# 	outfold = f'{infold}/{dataset_name}-nemo-processed'
-# 	infold = f'{infold}/'
-
-# 	if uncased:
-# 		outfold = f'{outfold}-uncased'
-
-# 	# if if_exist(outfold, ['dialogues.tsv']):
-# 	# 	logger.info(DATABASE_EXISTS_TMP.format(dataset_name, outfold))
-# 	# 	return outfold
-
-# 	logger.info(f'Processing {dataset_name} dataset and store at {outfold}')
-
-# 	os.makedirs(outfold, exist_ok=True)
-
-# 	processor = Dstc8DataProcessor(
-# 		infold,
-# 		train_file_range=FILE_RANGES[task_name]["train"],
-# 		dev_file_range=FILE_RANGES[task_name]["dev"],
-# 		test_file_range=FILE_RANGES[task_name]["test"],
-# 		tokenizer=tokenizer,
-# 		max_seq_length=max_seq_length,
-# 		log_data_warnings=log_data_warnings)
-
-# 	logger.info("Start generating the dialogue examples.")
-# 	_create_dialog_examples(processor, outfold + "/dialogues.tsv", dataset_split)
-# 	logger.info("Finish generating the dialogue examples.")
-
-# 	# Generate the schema embeddings if needed or specified.
-# 	# vocab_file = os.path.join(FLAGS.bert_ckpt_dir, "vocab.txt")
-# 	# bert_init_ckpt = os.path.join(FLAGS.bert_ckpt_dir, "bert_model.ckpt")
-# 	# tokenization.validate_case_matches_checkpoint(
-# 	# 	do_lower_case=FLAGS.do_lower_case, init_checkpoint=bert_init_ckpt)
-# 	#
-# 	# bert_config = modeling.BertConfig.from_json_file(
-# 	# 	os.path.join(FLAGS.bert_ckpt_dir, "bert_config.json"))
-# 	# if FLAGS.max_seq_length > bert_config.max_position_embeddings:
-# 	# 	raise ValueError(
-# 	# 		"Cannot use sequence length %d because the BERT model "
-# 	# 		"was only trained up to sequence length %d" %
-# 	# 		(FLAGS.max_seq_length, bert_config.max_position_embeddings))
-
-# 	schema_embedding_file = os.path.join(
-# 		infold,
-# 		f"{dataset_split}_pretrained_schema_embedding.npy")
-# 	if not if_exist("", [schema_embedding_file]):
-# 		logger.info("Start generating the schema embeddings.")
-# 		_create_schema_embeddings(encoder, schema_embedding_file)
-# 		logger.info("Finish generating the schema embeddings.")
-
-# 	return outfold
 
 
 def load_dialogues(dialog_json_filepaths):

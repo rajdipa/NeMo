@@ -30,6 +30,7 @@ _VOCAB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 _TEST_DATA_DIR = os.path.dirname(_VOCAB_FILE)
 _DO_LOWER_CASE = True
 _DATASET = 'train'
+_PRESERVE_UNUSED_TOKENS = False
 
 
 class Dstc8DataProcessorTest(absltest.TestCase):
@@ -42,7 +43,8 @@ class Dstc8DataProcessorTest(absltest.TestCase):
         dev_file_range=None,
         test_file_range=None,
         vocab_file=_VOCAB_FILE,
-        do_lower_case=_DO_LOWER_CASE)
+        do_lower_case=_DO_LOWER_CASE,
+        preserve_unused_tokens=_PRESERVE_UNUSED_TOKENS)
     super(Dstc8DataProcessorTest, self).setUp()
 
   def test_tokenizer(self):

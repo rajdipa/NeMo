@@ -14,6 +14,7 @@ from pytorch_transformers import BertTokenizer
 import nemo
 import nemo_nlp
 import nemo_nlp.data.datasets.sgd.data_utils as data_utils
+import nemo_nlp.data.datasets.sgd.sgd_preprocessing as utils
 from nemo_nlp.data.datasets.sgd import tokenization
 from nemo_nlp.utils.callbacks.joint_intent_slot import \
     eval_iter_callback, eval_epochs_done_callback
@@ -59,29 +60,26 @@ parser.add_argument("--save_checkpoints_steps", default=1000, type=int,
 parser.add_argument("--task_name", default="dstc8_single_domain", type=str,
                     choices=data_utils.FILE_RANGES.keys(),
                     help="The name of the task to train.")
-
 parser.add_argument("--data_dir", type=str, required=True,
                     help="Directory for the downloaded DSTC8 data, which contains the dialogue files"
                     " and schema files of all datasets (eg train, dev)")
-
 parser.add_argument("--run_mode", default="train", type=str,
                     choices=["train", "predict"],
                     help="The mode to run the script in.")
-
 parser.add_argument("--work_dir", type=str, required=True,
                     help="The output directory where the model checkpoints will be written.")
-
 parser.add_argument("--schema_embedding_dir", type=str, required=True,
                     help="Directory where .npy file for embedding of entities (slots, values,"
                     " intents) in the dataset_split's schema are stored.")
-
+parser.add_argument("--overwrite_schema_emb_file", action="store_true",
+                    help="Whether to generate a new Tf.record file saving the dialogue examples.")
 parser.add_argument("--dialogues_example_dir", type=str, required=True,
-                    help="Directory where tf.record of DSTC8 dialogues data are stored.")
-
+                    help="Directory where preprocessed DSTC8 dialogues are stored.")
+parser.add_argument("--overwrite_dial_file", action="store_true",
+                    help="Whether to generate a new Tf.record file saving the dialogue examples.")
 parser.add_argument("--dataset_split", type=str, required=True,
                     choices=["train", "dev", "test"],
                     help="Dataset split for training / prediction.")
-
 parser.add_argument("--local_rank", default=None, type=int)
 parser.add_argument("--amp_opt_level", default="O0",
                     type=str, choices=["O0", "O1", "O2"])
@@ -91,9 +89,7 @@ parser.add_argument("--amp_opt_level", default="O0",
 #     "Comma separated numbers, each being a step number of model checkpoint"
 #     " which makes predictions.")
 
-# flags.DEFINE_bool(
-#     "overwrite_dial_file", False,
-#     "Whether to generate a new Tf.record file saving the dialogue examples.")
+
 
 # flags.DEFINE_bool(
 #     "overwrite_schema_emb_file", False,
@@ -123,29 +119,7 @@ nf = nemo.core.NeuralModuleFactory(backend=nemo.core.Backend.PyTorch,
                                    files_to_copy=[__file__],
                                    add_time_to_log_dir=True)
 
-processor = data_utils.Dstc8DataProcessor(
-      args.data_dir,
-      train_file_range=data_utils.FILE_RANGES[task_name]["train"],
-      dev_file_range=data_utils.FILE_RANGES[task_name]["dev"],
-      test_file_range=data_utils.FILE_RANGES[task_name]["test"],
-      vocab_file=vocab_file,
-      do_lower_case=args.do_lower_case,
-      preserve_unused_tokens=args.preserve_unused_tokens,
-      max_seq_length=args.max_seq_length)
 
-# Generate the dialogue examples if needed or specified.
-dial_file_name = "{}_{}_examples.processed".format(task_name,
-                                                   args.dataset_split)
-dial_file = os.path.join(args.dialogues_example_dir, dial_file_name)
-
-if not os.path.exists(args.dialogues_example_dir):
-    os.makedirs(args.dialogues_example_dir)
-if not os.path.exists(dial_file):
-    nf.logger.info("Start generating the dialogue examples.")
-    data_utils._create_dialog_examples(processor, dial_file, args.dataset_split)
-    nf.logger.info("Finish generating the dialogue examples.")
-
-# Generate the schema embeddings if needed or specified.
 bert_init_ckpt = os.path.join(args.bert_ckpt_dir, "bert_model.ckpt")
 
 pretrained_bert_model = nemo_nlp.huggingface.BERT(
@@ -154,6 +128,53 @@ pretrained_bert_model = nemo_nlp.huggingface.BERT(
 
 tokenization.validate_case_matches_checkpoint(
   do_lower_case=args.do_lower_case, init_checkpoint=bert_init_ckpt)
+
+# BERT tokenizer
+tokenizer = tokenization.FullTokenizer(
+    vocab_file=vocab_file,
+    do_lower_case=args.do_lower_case,
+    preserve_unused_tokens=args.preserve_unused_tokens)
+
+
+sgd_preprocessor = utils.SGDPreprocessor(
+      data_dir=args.data_dir,
+      dialogues_example_dir=args.dialogues_example_dir,
+      schema_embedding_dir=args.schema_embedding_dir,
+      task_name=args.task_name,
+      vocab_file=vocab_file,
+      do_lower_case=args.do_lower_case,
+      max_seq_length=args.max_seq_length,
+      tokenizer=tokenizer,
+      bert_model=pretrained_bert_model,
+      dataset_split=args.dataset_split,
+      overwrite_dial_file=args.overwrite_dial_file,
+      overwrite_schema_emb_file=args.overwrite_schema_emb_file,
+      bert_ckpt_dir=args.bert_ckpt_dir)
+
+
+# processor = data_utils.Dstc8DataProcessor(
+#       args.data_dir,
+#       train_file_range=data_utils.FILE_RANGES[task_name]["train"],
+#       dev_file_range=data_utils.FILE_RANGES[task_name]["dev"],
+#       test_file_range=data_utils.FILE_RANGES[task_name]["test"],
+#       vocab_file=vocab_file,
+#       do_lower_case=args.do_lower_case,
+#       tokenizer=tokenizer,
+#       max_seq_length=args.max_seq_length)
+
+# # Generate the dialogue examples if needed or specified.
+# dial_file_name = "{}_{}_examples.processed".format(task_name,
+#                                                    args.dataset_split)
+# dial_file = os.path.join(args.dialogues_example_dir, dial_file_name)
+
+# if not os.path.exists(args.dialogues_example_dir):
+#     os.makedirs(args.dialogues_example_dir)
+# if not os.path.exists(dial_file):
+#     nf.logger.info("Start generating the dialogue examples.")
+#     data_utils._create_dialog_examples(processor, dial_file, args.dataset_split)
+#     nf.logger.info("Finish generating the dialogue examples.")
+
+#
 
 # bert_config = modeling.BertConfig.from_json_file(
 #   os.path.join(FLAGS.bert_ckpt_dir, "bert_config.json"))
@@ -168,48 +189,8 @@ bert_config = os.path.join(args.bert_ckpt_dir, 'bert_config.json')
 if not os.path.exists(bert_config):
     raise ValueError(f'bert_config.json not found at {args.bert_ckpt_dir}')
 
-schema_embedding_file = os.path.join(args.schema_embedding_dir,
-    "{}_pretrained_schema_embedding.npy".format(args.dataset_split))
-
-if not os.path.exists(schema_embedding_file):
-    nf.logger.info("Start generating the schema embeddings.")
-    # create schema embedding if no file exists
-    # TODO move to DataDescription
-    schema_json_path = os.path.join(args.data_dir, 
-                                    args.dataset_split,
-                                    "schema.json")
-
-    vocab_file = os.path.join(args.bert_ckpt_dir, "vocab.txt")
-    tokenizer = tokenization.FullTokenizer(vocab_file=vocab_file,
-                                           do_lower_case=args.do_lower_case,
-                                           preserve_unused_tokens=args.preserve_unused_tokens)
-
-    emb_datalayer = nemo_nlp.BertInferDataLayer(dataset_type='SchemaEmbeddingDataset',
-                                                tokenizer=tokenizer,
-                                                max_seq_length=args.max_seq_length,
-                                                input_file=schema_json_path)
-
-    print ('TO DO >>>')
-    
-    input_ids, input_mask, input_type_ids = emb_datalayer()
-    hidden_states = pretrained_bert_model(input_ids=input_ids,
-                                          token_type_ids=input_type_ids,
-                                          attention_mask=input_mask)
-
-    evaluated_tensors = nf.infer(tensors=[hidden_states],
-                                 checkpoint_dir=args.bert_ckpt_dir)
-
-    def concatenate(lists):
-        return np.concatenate([t.cpu() for t in lists])
 
 
-    def get_preds(logits):
-        return np.argmax(logits, 1)
-
-    hidden_states = [concatenate(tensors) for tensors in evaluated_tensors]
-    emb_datalayer.dataset.save_embeddings(hidden_states,
-                                          schema_embedding_file)
-    nf.logger.info("Finish generating the schema embeddings.")
     
 
 # """ Load the pretrained BERT parameters
