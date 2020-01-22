@@ -66,7 +66,7 @@ parser.add_argument("--data_dir", type=str, required=True,
 parser.add_argument("--run_mode", default="train", type=str,
                     choices=["train", "predict"],
                     help="The mode to run the script in.")
-parser.add_argument("--work_dir", type=str, required=True,
+parser.add_argument("--work_dir", type=str, default="output/SGD",
                     help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--schema_embedding_dir", type=str, required=True,
                     help="Directory where .npy file for embedding of entities (slots, values,"
@@ -76,7 +76,7 @@ parser.add_argument("--overwrite_schema_emb_file", action="store_true",
 parser.add_argument("--dialogues_example_dir", type=str, required=True,
                     help="Directory where preprocessed DSTC8 dialogues are stored.")
 parser.add_argument("--overwrite_dial_file", action="store_true",
-                    help="Whether to generate a new Tf.record file saving the dialogue examples.")
+                    help="Whether to generate a new file saving the dialogue examples.")
 parser.add_argument("--dataset_split", type=str, required=True,
                     choices=["train", "dev", "test"],
                     help="Dataset split for training / prediction.")
@@ -135,7 +135,7 @@ tokenizer = tokenization.FullTokenizer(
     do_lower_case=args.do_lower_case,
     preserve_unused_tokens=args.preserve_unused_tokens)
 
-
+# Run SGD preprocessor to prepare schema embeddings abd dialogue example files
 sgd_preprocessor = utils.SGDPreprocessor(
       data_dir=args.data_dir,
       dialogues_example_dir=args.dialogues_example_dir,
@@ -149,7 +149,8 @@ sgd_preprocessor = utils.SGDPreprocessor(
       dataset_split=args.dataset_split,
       overwrite_dial_file=args.overwrite_dial_file,
       overwrite_schema_emb_file=args.overwrite_schema_emb_file,
-      bert_ckpt_dir=args.bert_ckpt_dir)
+      bert_ckpt_dir=args.bert_ckpt_dir,
+      nf=nf)
 
 
 # processor = data_utils.Dstc8DataProcessor(
@@ -170,9 +171,9 @@ sgd_preprocessor = utils.SGDPreprocessor(
 # if not os.path.exists(args.dialogues_example_dir):
 #     os.makedirs(args.dialogues_example_dir)
 # if not os.path.exists(dial_file):
-#     nf.logger.info("Start generating the dialogue examples.")
+#     nemo.logging.info("Start generating the dialogue examples.")
 #     data_utils._create_dialog_examples(processor, dial_file, args.dataset_split)
-#     nf.logger.info("Finish generating the dialogue examples.")
+#     nemo.logging.info("Finish generating the dialogue examples.")
 
 #
 
@@ -231,7 +232,7 @@ if not os.path.exists(bert_config):
 #                   num_gpus=1,
 #                   local_rank=0,
 #                   mode='train'):
-#   nf.logger.info(f"Loading {mode} data...")
+#   nemo.logging.info(f"Loading {mode} data...")
 #   data_file = f'{data_desc.data_dir}/{mode}.tsv'
 #   slot_file = f'{data_desc.data_dir}/{mode}_slots.tsv'
 #   shuffle = args.shuffle_data if mode == 'train' else False
@@ -256,12 +257,12 @@ if not os.path.exists(bert_config):
 #   data_size = len(data_layer)
 
 #   if data_size < batch_size:
-#       nf.logger.warning("Batch_size is larger than the dataset size")
-#       nf.logger.warning("Reducing batch_size to dataset size")
+#       nemo.logging.warning("Batch_size is larger than the dataset size")
+#       nemo.logging.warning("Reducing batch_size to dataset size")
 #       batch_size = data_size
 
 #   steps_per_epoch = math.ceil(data_size / (batch_size * num_gpus))
-#   nf.logger.info(f"Steps_per_epoch = {steps_per_epoch}")
+#   nemo.logging.info(f"Steps_per_epoch = {steps_per_epoch}")
 
 #   hidden_states = pretrained_bert_model(input_ids=ids,
 #                                         token_type_ids=type_ids,

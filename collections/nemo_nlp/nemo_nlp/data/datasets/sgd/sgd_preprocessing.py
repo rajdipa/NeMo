@@ -1,13 +1,37 @@
 import os
 
+import nemo
 import nemo_nlp
-import nemo_nlp.data.datasets.sgd.data_utils as data_utils
+from  nemo_nlp.utils import nlp_utils
+from nemo_nlp.data.datasets.sgd import data_utils
 
 
 class SGDPreprocessor:
     """ 
     Convert the raw data to the standard format supported by
     StateTrackingSGDData.
+    
+    Args:
+        data_dir (str) - Directory for the downloaded DSTC8 data, which contains
+            the dialogue files and schema files of all datasets (eg train, dev)
+        dialogues_example_dir (str) - Directory where preprocessed DSTC8 dialogues are stored
+        schema_embedding_dir (str) - Directory where .npy file for embedding of
+            entities (slots, values, intents) in the dataset_split's
+            schema are stored.
+        task_name (str) - The name of the task to train
+        vocab_file (str) - The path to BERT vocab file
+        do_lower_case - (bool) - Whether to lower case the input text.
+            Should be True for uncased models and False for cased models.
+        max_seq_length (int) - The maximum total input sequence length after
+            WordPiece tokenization. Sequences longer than this will be
+            truncated, and sequences shorter than this will be padded."
+        tokenizer - tokenizer
+        bert_model - pretrained BERT model
+        dataset_split (str) - Dataset split for training / prediction (train/dev/test)
+        overwrite_dial_file (bool) - Whether to generate a new file saving
+            the dialogue examples overwrite_schema_emb_file,
+        bert_ckpt_dir (str) - Directory containing pre-trained BERT checkpoint
+        nf - NeuralModuleFactory
     """
     def __init__(self,
                  data_dir,
@@ -22,7 +46,8 @@ class SGDPreprocessor:
                  dataset_split,
                  overwrite_dial_file,
                  overwrite_schema_emb_file,
-                 bert_ckpt_dir):
+                 bert_ckpt_dir,
+                 nf):
 
         processor = data_utils.Dstc8DataProcessor(
               data_dir,
@@ -42,11 +67,11 @@ class SGDPreprocessor:
         if not os.path.exists(dialogues_example_dir):
             os.makedirs(dialogues_example_dir)
         if not os.path.exists(dial_file) or overwrite_dial_file:
-            nf.logger.info("Start generating the dialogue examples.")
+            nemo.logging.info("Start generating the dialogue examples.")
             data_utils._create_dialog_examples(processor,
                                                dial_file,
                                                dataset_split)
-            nf.logger.info("Finish generating the dialogue examples.")
+            nemo.logging.info("Finish generating the dialogue examples.")
 
 
         schema_embedding_file = os.path.join(schema_embedding_dir,
@@ -54,7 +79,7 @@ class SGDPreprocessor:
 
         # Generate the schema embeddings if needed or specified.
         if not os.path.exists(schema_embedding_file) or overwrite_schema_emb_file:
-            nf.logger.info("Start generating the schema embeddings.")
+            nemo.logging.info("Start generating the schema embeddings.")
             # create schema embedding if no file exists
             schema_json_path = os.path.join(data_dir, 
                                             dataset_split,
@@ -73,15 +98,10 @@ class SGDPreprocessor:
             evaluated_tensors = nf.infer(tensors=[hidden_states],
                                          checkpoint_dir=bert_ckpt_dir)
 
-            def concatenate(lists):
-                return np.concatenate([t.cpu() for t in lists])
 
 
-            def get_preds(logits):
-                return np.argmax(logits, 1)
-
-            hidden_states = [concatenate(tensors) for tensors in evaluated_tensors]
+            hidden_states = [nlp_utils.concatenate(tensors) for tensors in evaluated_tensors]
             emb_datalayer.dataset.save_embeddings(hidden_states,
                                                   schema_embedding_file)
-            nf.logger.info(f"The schema embeddings saved at {schema_embedding_file}")
-            nf.logger.info("Finish generating the schema embeddings.")
+            nemo.logging.info(f"The schema embeddings saved at {schema_embedding_file}")
+            nemo.logging.info("Finish generating the schema embeddings.")

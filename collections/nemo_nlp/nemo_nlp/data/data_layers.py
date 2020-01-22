@@ -6,6 +6,7 @@
 
 __all__ = ['GlueDataLayerClassification',
            'GlueDataLayerRegression',
+           'BertInferDataLayer',
            'BertJointIntentSlotDataLayer',
            'BertJointIntentSlotInferDataLayer',
            'BertPunctuationCapitalizationDataLayer',

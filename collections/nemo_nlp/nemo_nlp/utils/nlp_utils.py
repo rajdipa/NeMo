@@ -133,3 +133,17 @@ def plot_confusion_matrix(label_ids,
     title = (prefix + ' ' + title).strip()
     plt.savefig(os.path.join(graph_fold,
                              title + '_' + time.strftime('%Y%m%d-%H%M%S')))
+
+
+def concatenate(lists):
+    """
+    Helper function for inference
+    """
+    return np.concatenate([t.cpu() for t in lists])
+
+
+def get_preds(logits):
+    """
+    Helper function for inference
+    """
+    return np.argmax(logits, 1)
