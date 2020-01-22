@@ -8,9 +8,9 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from enum import Enum
 from inspect import getargvalues, stack
-import logging
 from typing import Optional, Dict, Set, Tuple, List
 import uuid
+import collections
 
 from nemo.core import NeuralModuleFactory
 
@@ -66,8 +66,6 @@ class NeuralModule(ABC):
             else DeviceType.GPU
         self._opt_level = factory.optim_level if factory is not None\
             else Optimization.mxprO0
-        self._logger = factory.logger if factory is not None\
-            else logging
 
         # Update module properties using overrides if overrides exist
         if placement is not None:
@@ -77,11 +75,11 @@ class NeuralModule(ABC):
         self._uuid = str(uuid.uuid4())
 
         # if kwargs:
-        #    self._logger.warning(
+        #    nemo.logging.warning(
         #        "When constructing {}. The base "
         #        "NeuralModule class received the following unused "
         #        "arguments:".format(self.__class__.__name__))
-        #    self._logger.warning("{}".format(kwargs.keys()))
+        #    nemo.logging.warning("{}".format(kwargs.keys()))
 
     @staticmethod
     def create_ports(**kwargs):
@@ -213,7 +211,19 @@ class NeuralModule(ABC):
                         ntype=out_type,
                     )
                 )
-            return tuple(result)
+
+            # Creating ad-hoc class for returning from module's forward pass.
+            output_class_name = f'{self.__class__.__name__}Output'
+            field_names = list(output_port_defs)
+            result_type = collections.namedtuple(
+                typename=output_class_name,
+                field_names=field_names,
+            )
+
+            # Tie tuple of output tensors with corresponding names.
+            result = result_type(*result)
+
+            return result
 
     def __str__(self):
         return self.__class__.__name__

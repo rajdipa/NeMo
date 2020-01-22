@@ -4,10 +4,12 @@ from .glue import GLUEDataset
 from .joint_intent_slot import (BertJointIntentSlotDataset,
                                 BertJointIntentSlotInferDataset)
 from .language_modeling import LanguageModelingDataset
+from .punctuation_capitalization import (
+    BertPunctuationCapitalizationDataset,
+    BertPunctuationCapitalizationInferDataset)
+from .sentence_classification import BertSentenceClassificationDataset
+from .sgd.schema_embedding_dataset import SchemaEmbeddingDataset
+from .squad import SquadDataset
 from .token_classification import (BertTokenClassificationDataset,
                                    BertTokenClassificationInferDataset)
-from .punctuation_capitalization import BertPunctuationCapitalizationDataset,\
-  BertPunctuationCapitalizationInferDataset
-from .sgd.schema_embedding_dataset import SchemaEmbeddingDataset
-from .sentence_classification import BertSentenceClassificationDataset
 from .translation import TranslationDataset

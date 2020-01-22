@@ -10,12 +10,16 @@ __all__ = ['AudioToTextDataLayer',
 from functools import partial
 import torch
 
+import nemo
 from nemo.backends.pytorch import DataLayerNM
 from nemo.core import DeviceType
 from nemo.core.neural_types import *
 from nemo.utils.misc import pad_to
 from .parts.dataset import (
-    AudioDataset, seq_collate_fn, KaldiFeatureDataset, TranscriptDataset)
+    AudioDataset,
+    seq_collate_fn,
+    KaldiFeatureDataset,
+    TranscriptDataset)
 from .parts.features import WaveformFeaturizer
 
 
@@ -46,8 +50,8 @@ transcript_n}
         int_values (bool): Bool indicating whether the audio file is saved as
             int data or float data.
             Defaults to False.
-        eos_id (str): Dataset parameter.
-            End of string symbol used for seq2seq models.
+        eos_id (id): Dataset parameter.
+            End of string symbol id used for seq2seq models.
             Defaults to None.
         min_duration (float): Dataset parameter.
             All training files which have a duration less than min_duration
@@ -146,14 +150,13 @@ transcript_n}
                           'trim': trim_silence,
                           'bos_id': bos_id,
                           'eos_id': eos_id,
-                          'logger': self._logger,
                           'load_audio': load_audio}
 
         self._dataset = AudioDataset(**dataset_params)
 
         # Set up data loader
         if self._placement == DeviceType.AllGpu:
-            self._logger.info('Parallelizing DATALAYER')
+            nemo.logging.info('Parallelizing DATALAYER')
             sampler = torch.utils.data.distributed.DistributedSampler(
                 self._dataset)
         else:
@@ -272,13 +275,12 @@ class KaldiFeatureDataLayer(DataLayerNM):
                           'labels': labels,
                           'min_duration': min_duration,
                           'max_duration': max_duration,
-                          'normalize': normalize_transcripts,
-                          'logger': self._logger}
+                          'normalize': normalize_transcripts}
         self._dataset = KaldiFeatureDataset(**dataset_params)
 
         # Set up data loader
         if self._placement == DeviceType.AllGpu:
-            self._logger.info('Parallelizing DATALAYER')
+            nemo.logging.info('Parallelizing DATALAYER')
             sampler = torch.utils.data.distributed.DistributedSampler(
                 self._dataset)
         else:
