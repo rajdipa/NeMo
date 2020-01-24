@@ -13,7 +13,8 @@ __all__ = ['JointIntentSlotLoss',
            'MaskedLanguageModelingLossNM',
            'PaddedSmoothedCrossEntropyLossNM',
            'QuestionAnsweringLoss',
-           'TokenClassificationLoss']
+           'TokenClassificationLoss',
+           'SGDDSTBaselineLoss']
 
 
 class QuestionAnsweringLoss(LossNM):
@@ -509,4 +510,78 @@ class PaddedSmoothedCrossEntropyLossNM(LossNM):
         target_mask = mask_padded_tokens(
             target_ids, self._pad_id).to(logits.dtype)
         loss = self._loss_fn(logits, target_ids, target_mask)
+        return loss
+
+
+class SGDDSTBaselineLoss(LossNM):
+    """
+    Neural module which implements Token Classification loss.
+
+    Args:
+        num_classes (int): number of classes in a classifier, e.g. size
+            of the vocabulary in language modeling objective
+        logits (float): output of the classifier
+        labels (long): ground truth labels
+        loss_mask (long): to differentiate from original tokens and paddings
+    """
+
+    @property
+    def input_ports(self):
+        """Returns definitions of module input ports.
+
+        logits:
+            0: AxisType(BatchTag)
+
+            1: AxisType(TimeTag)
+
+            2: AxisType(ChannelTag)
+
+        labels:
+            0: AxisType(BatchTag)
+
+            1: AxisType(TimeTag)
+
+        loss_mask:
+            0: AxisType(BatchTag)
+
+            1: AxisType(TimeTag)
+        """
+        return {
+            "logits": NeuralType({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag),
+                2: AxisType(ChannelTag)
+            }),
+            # "labels": NeuralType({
+            #     0: AxisType(BatchTag),
+            #     1: AxisType(TimeTag)
+            # }),
+            # "loss_mask": NeuralType({
+            #     0: AxisType(BatchTag),
+            #     1: AxisType(TimeTag)
+            # })
+        }
+
+    @property
+    def output_ports(self):
+        """Returns definitions of module output ports.
+
+        loss:
+            NeuralType(None)
+        """
+        return {
+            "loss": NeuralType(None)
+        }
+
+    def __init__(self, **kwargs):
+        LossNM.__init__(self, **kwargs)
+        # if class_weights:
+        #     class_weights = torch.FloatTensor(class_weights).to(self._device)
+
+        # self._criterion = nn.CrossEntropyLoss(weight=class_weights)
+        # self.num_classes = num_classes
+
+    def _loss_function(self, logits):
+        import pdb; pdb.set_trace()
+        loss = logits
         return loss

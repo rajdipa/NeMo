@@ -19,6 +19,8 @@ from nemo_nlp.data.datasets.sgd import tokenization
 from nemo_nlp.utils.callbacks.joint_intent_slot import \
     eval_iter_callback, eval_epochs_done_callback
 
+from nemo_nlp.modules import sgd_modules
+
 # Parsing arguments
 parser = argparse.ArgumentParser(description='Schema_guided_dst')
 
@@ -36,18 +38,21 @@ parser.add_argument("--max_seq_length", default=80, type=int,
                     help="The maximum total input sequence length after WordPiece tokenization. "
                     "Sequences longer than this will be truncated, and sequences shorter "
                     "than this will be padded.")
-parser.add_argument("--dropout_rate", default=0.1, type=float,
-                   help="Dropout rate for BERT representations.")
+parser.add_argument("--dropout", default=0.1, type=float,
+                    help="Dropout rate for BERT representations.")
 
 # Hyperparameters and optimization related flags.
+parser.add_argument("--num_epochs", default=1, type=int,
+                    help="Number of epochs for training")
+parser.add_argument("--optimizer_kind", default="adam", type=str)
 parser.add_argument("--train_batch_size", default=32, type=int,
-                     help="Total batch size for training.")
+                    help="Total batch size for training.")
 parser.add_argument("--eval_batch_size", default=8, type=int,
-                     help="Total batch size for eval.")
+                    help="Total batch size for eval.")
 parser.add_argument("--predict_batch_size", default=8, type=int,
-                     help="Total batch size for predict.")
+                    help="Total batch size for predict.")
 parser.add_argument("--learning_rate", default=1e-4, type=float, 
-                     help="The initial learning rate for Adam.")
+                    help="The initial learning rate for Adam.")
 parser.add_argument("--num_train_epochs", default=80.0, type=int,
                     help="Total number of training epochs to perform.")
 parser.add_argument("--warmup_proportion", default=0.1, type=float,
@@ -77,6 +82,8 @@ parser.add_argument("--dialogues_example_dir", type=str, required=True,
                     help="Directory where preprocessed DSTC8 dialogues are stored.")
 parser.add_argument("--overwrite_dial_file", action="store_true",
                     help="Whether to generate a new file saving the dialogue examples.")
+parser.add_argument("--shuffle", type=bool, default=False,
+                    help="Whether to shuffle training data")
 parser.add_argument("--dataset_split", type=str, required=True,
                     choices=["train", "dev", "test"],
                     help="Dataset split for training / prediction.")
@@ -84,20 +91,6 @@ parser.add_argument("--local_rank", default=None, type=int)
 parser.add_argument("--amp_opt_level", default="O0",
                     type=str, choices=["O0", "O1", "O2"])
 
-# flags.DEFINE_string(
-#     "eval_ckpt", "",
-#     "Comma separated numbers, each being a step number of model checkpoint"
-#     " which makes predictions.")
-
-
-
-# flags.DEFINE_bool(
-#     "overwrite_schema_emb_file", False,
-#     "Whether to generate a new schema_emb file saving the schemas' embeddings.")
-
-# flags.DEFINE_bool(
-#     "log_data_warnings", False,
-#     "If True, warnings created using data processing are logged.")
 
 args = parser.parse_args()
 
@@ -135,61 +128,105 @@ tokenizer = tokenization.FullTokenizer(
     do_lower_case=args.do_lower_case,
     preserve_unused_tokens=args.preserve_unused_tokens)
 
-# Run SGD preprocessor to prepare schema embeddings abd dialogue example files
-sgd_preprocessor = utils.SGDPreprocessor(
-      data_dir=args.data_dir,
-      dialogues_example_dir=args.dialogues_example_dir,
-      schema_embedding_dir=args.schema_embedding_dir,
-      task_name=args.task_name,
-      vocab_file=vocab_file,
-      do_lower_case=args.do_lower_case,
-      max_seq_length=args.max_seq_length,
-      tokenizer=tokenizer,
-      bert_model=pretrained_bert_model,
-      dataset_split=args.dataset_split,
-      overwrite_dial_file=args.overwrite_dial_file,
-      overwrite_schema_emb_file=args.overwrite_schema_emb_file,
-      bert_ckpt_dir=args.bert_ckpt_dir,
-      nf=nf)
+# Run SGD preprocessor to generate and store schema embeddings
+schema_preprocessor = utils.SchemaPreprocessor(
+    data_dir=args.data_dir,
+    schema_embedding_dir=args.schema_embedding_dir,
+    max_seq_length=args.max_seq_length,
+    tokenizer=tokenizer,
+    bert_model=pretrained_bert_model,
+    dataset_split=args.dataset_split,
+    overwrite_schema_emb_file=args.overwrite_schema_emb_file,
+    bert_ckpt_dir=args.bert_ckpt_dir,
+    nf=nf)
 
+train_datalayer = nemo_nlp.SGDDataLayer(
+    task_name=args.task_name,
+    vocab_file=vocab_file,
+    do_lower_case=args.do_lower_case,
+    tokenizer=tokenizer,
+    max_seq_length=args.max_seq_length,
+    data_dir=args.data_dir,
+    dialogues_example_dir=args.dialogues_example_dir,
+    overwrite_dial_file=args.overwrite_dial_file,
+    shuffle=args.shuffle,
+    dataset_split=args.dataset_split,
+    schema_emb_processor=schema_preprocessor)
 
-# processor = data_utils.Dstc8DataProcessor(
-#       args.data_dir,
-#       train_file_range=data_utils.FILE_RANGES[task_name]["train"],
-#       dev_file_range=data_utils.FILE_RANGES[task_name]["dev"],
-#       test_file_range=data_utils.FILE_RANGES[task_name]["test"],
-#       vocab_file=vocab_file,
-#       do_lower_case=args.do_lower_case,
-#       tokenizer=tokenizer,
-#       max_seq_length=args.max_seq_length)
-
-# # Generate the dialogue examples if needed or specified.
-# dial_file_name = "{}_{}_examples.processed".format(task_name,
-#                                                    args.dataset_split)
-# dial_file = os.path.join(args.dialogues_example_dir, dial_file_name)
-
-# if not os.path.exists(args.dialogues_example_dir):
-#     os.makedirs(args.dialogues_example_dir)
-# if not os.path.exists(dial_file):
-#     nemo.logging.info("Start generating the dialogue examples.")
-#     data_utils._create_dialog_examples(processor, dial_file, args.dataset_split)
-#     nemo.logging.info("Finish generating the dialogue examples.")
-
-#
-
-# bert_config = modeling.BertConfig.from_json_file(
-#   os.path.join(FLAGS.bert_ckpt_dir, "bert_config.json"))
-# if FLAGS.max_seq_length > bert_config.max_position_embeddings:
-# raise ValueError(
-#     "Cannot use sequence length %d because the BERT model "
-#     "was only trained up to sequence length %d" %
-#     (FLAGS.max_seq_length, bert_config.max_position_embeddings))
 
 # fix
 bert_config = os.path.join(args.bert_ckpt_dir, 'bert_config.json')
 if not os.path.exists(bert_config):
     raise ValueError(f'bert_config.json not found at {args.bert_ckpt_dir}')
 
+input_data = train_datalayer()
+
+hidden_size = pretrained_bert_model.local_parameters["hidden_size"]
+
+# Encode the utterances using BERT.
+encoded_tokens = pretrained_bert_model(input_ids=input_data.utterance_ids,
+                                       attention_mask=input_data.utterance_mask,
+                                       token_type_ids=input_data.utterance_segment)
+
+encoder_extractor = sgd_modules.Encoder(hidden_size=hidden_size,
+                                        dropout=args.dropout)
+
+utterance_encoding = encoder_extractor(hidden_states=encoded_tokens)
+
+
+nf.infer(tensors=[utterance_encoding],
+         checkpoint_dir=args.bert_ckpt_dir)
+
+import pdb; pdb.set_trace()
+print ()
+
+
+# from schema embedding
+outputs = {}
+outputs["logit_intent_status"] = self._get_intents(features)
+outputs["logit_req_slot_status"] = self._get_requested_slots(features)
+cat_slot_status, cat_slot_value = self._get_categorical_slot_goals(features)
+outputs["logit_cat_slot_status"] = cat_slot_status
+outputs["logit_cat_slot_value"] = cat_slot_value
+noncat_slot_status, noncat_span_start, noncat_span_end = (
+    self._get_noncategorical_slot_goals(features))
+outputs["logit_noncat_slot_status"] = noncat_slot_status
+outputs["logit_noncat_slot_start"] = noncat_span_start
+outputs["logit_noncat_slot_end"] = noncat_span_end
+
+
+
+# nf.train(tensors_to_optimize=[utterance_encoding],
+#          # callbacks=[train_callback, eval_callback, ckpt_callback],
+#          # lr_policy=lr_policy_fn,
+#          optimizer=args.optimizer_kind,
+#          optimization_params={"num_epochs": args.num_epochs,
+#                               "lr": args.learning_rate}
+#                               )
+
+
+# encoded_utterance = bert_encoder.get_pooled_output()
+# encoded_tokens = bert_encoder.get_sequence_output()
+
+# Apply dropout in training mode.
+# encoded_utterance = tf.layers.dropout(
+#     encoded_utterance, rate=FLAGS.dropout_rate, training=is_training)
+# encoded_tokens = tf.layers.dropout(
+#     encoded_tokens, rate=FLAGS.dropout_rate, training=is_training)
+# return encoded_utterance, encoded_tokens
+
+
+
+# TODO: add max_seq_len checkp
+"""
+bert_config = modeling.BertConfig.from_json_file(
+      os.path.join(FLAGS.bert_ckpt_dir, "bert_config.json"))
+  if FLAGS.max_seq_length > bert_config.max_position_embeddings:
+    raise ValueError(
+        "Cannot use sequence length %d because the BERT model "
+        "was only trained up to sequence length %d" %
+        (FLAGS.max_seq_length, bert_config.max_position_embeddings))
+"""
 
 
     

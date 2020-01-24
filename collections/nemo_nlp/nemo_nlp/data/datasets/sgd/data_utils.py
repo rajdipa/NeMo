@@ -291,7 +291,7 @@ class Dstc8DataProcessor(object):
 		Args:
 		  dataset: str. can be "train", "dev", or "test".
 
-		Returns:
+		Returns:from nemo_nlp.data.datasets.sgd import data_utils
 		  example_count: int. number of examples in the specified dataset.
 		"""
 		example_count = 0
@@ -652,12 +652,6 @@ def load_dialogues(dialog_json_filepaths):
 		with open(dialog_json_filepath, 'r') as f:
 			dialogs.extend(json.load(f))
 	return dialogs
-
-
-def _create_dialog_examples(processor, dial_file, dataset_split):
-	"""Create dialog examples and save in the file."""
-	frame_examples = processor.get_dialog_examples(dataset_split)
-	file_based_convert_examples_to_features(frame_examples, dial_file)
 
 
 def list_to_str(l):

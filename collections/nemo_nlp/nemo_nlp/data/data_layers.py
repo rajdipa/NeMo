@@ -18,6 +18,7 @@ __all__ = ['GlueDataLayerClassification',
            'BertTokenClassificationInferDataLayer',
            'BertQuestionAnsweringDataLayer',
            'LanguageModelingDataLayer',
+           'SGDDataLayer',
            'TextDataLayer',
            'TranslationDataLayer']
 import os
@@ -457,7 +458,7 @@ class BertInferDataLayer(TextDataLayer):
         dataset_params = {
                           'tokenizer': tokenizer,
                           'max_seq_length': max_seq_length,
-                          'input_file': input_file
+                          'input_file': input_filef
                           }
         super().__init__(dataset_type, dataset_params, **kwargs)
 
@@ -1413,4 +1414,165 @@ class GlueDataLayerRegression(TextDataLayer):
                           'tokenizer': tokenizer,
                           'max_seq_length': max_seq_length}
 
+        super().__init__(dataset_type, dataset_params, **kwargs)
+
+class SGDDataLayer(TextDataLayer):
+    """
+    Data layer for Schema Guided Dialogue State Tracking Dataset.
+
+    Args:
+        TODO: fix
+    """
+
+    @property
+    def output_ports(self):
+        """Returns definitions of module output ports.
+        TODO update
+        input_ids: indices of tokens which constitute batches of text segments
+            0: AxisType(BatchTag)
+
+            1: AxisType(TimeTag)
+
+        input_type_ids: indices of token types (e.g., sentences A & B in BERT)
+            0: AxisType(BatchTag)
+
+            1: AxisType(TimeTag)
+
+        input_mask: bool tensor with 0s in place of tokens to be masked
+            0: AxisType(BatchTag)
+
+            1: AxisType(TimeTag)
+
+        """
+        return {
+            "example_id": NeuralType ({
+                0: AxisType(BatchTag)
+            }),
+            "is_real_example":NeuralType ({
+                0: AxisType(BatchTag)
+            }),
+            "service_id": NeuralType ({
+                0: AxisType(BatchTag)
+            }),
+            "utterance_ids": NeuralType({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "utterance_segment": NeuralType({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "utterance_mask": NeuralType({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "num_categorical_slots": NeuralType ({
+                0: AxisType(BatchTag)
+            }),
+            "categorical_slot_status": NeuralType ({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "num_categorical_slot_values": NeuralType ({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "categorical_slot_values": NeuralType ({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "num_noncategorical_slots": NeuralType ({
+                0: AxisType(BatchTag)
+            }),
+            "noncategorical_slot_status": NeuralType ({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "noncategorical_slot_value_start": NeuralType ({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "noncategorical_slot_value_end": NeuralType ({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "start_char_idx": NeuralType ({
+                0:AxisType(BatchTag)
+            }),
+            "end_char_idx": NeuralType ({
+                0:AxisType(BatchTag)
+            }),
+            "num_slots": NeuralType ({
+                0:AxisType(BatchTag)
+            }),
+            "requested_slot_status": NeuralType ({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag)
+            }),
+            "num_intents": NeuralType ({
+                0:AxisType(BatchTag)
+            }),
+            "intent_status": NeuralType ({
+                0:AxisType(BatchTag)
+            }),
+            "cat_slot_emb": NeuralType ({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag),
+                2: AxisType(ChannelTag)
+            }),
+            "cat_slot_value_emb": NeuralType ({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag),
+                2: AxisType(ChannelTag),
+                3: AxisType(ChannelTag)
+            }),
+            "noncat_slot_emb": NeuralType ({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag),
+                2: AxisType(ChannelTag)
+            }),
+            "req_slot_emb": NeuralType ({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag),
+                2: AxisType(ChannelTag)
+            }),
+            "intent_emb": NeuralType ({
+                0: AxisType(BatchTag),
+                1: AxisType(TimeTag),
+                2: AxisType(ChannelTag)
+            })
+          }
+
+    def __init__(self,
+                 task_name,
+                 vocab_file,
+                 do_lower_case,
+                 tokenizer,
+                 max_seq_length,
+                 data_dir,
+                 dialogues_example_dir,
+                 overwrite_dial_file,
+                 shuffle,
+                 dataset_split,
+                 schema_emb_processor,
+                 dataset_type='SGDDataset',
+                 batch_size=1,
+                 **kwargs):
+        kwargs['batch_size'] = batch_size
+
+        if dataset_split != 'train':
+            kwargs['shuffle'] = False
+        else:
+          kwargs['shuffle'] = shuffle
+        dataset_params = {'task_name': task_name,
+                          'vocab_file': vocab_file,
+                          'do_lower_case': do_lower_case,
+                          'tokenizer': tokenizer,
+                          'max_seq_length': max_seq_length,
+                          'data_dir': data_dir,
+                          'dialogues_example_dir': dialogues_example_dir,
+                          'overwrite_dial_file': overwrite_dial_file,
+                          'dataset_split': dataset_split,
+                          'schema_emb_processor': schema_emb_processor
+                          }
         super().__init__(dataset_type, dataset_params, **kwargs)

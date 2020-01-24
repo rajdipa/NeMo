@@ -50,19 +50,18 @@ class SchemaEmbeddingDataset(Dataset):
         self._max_seq_length = max_seq_length
         self.schemas = schema.Schema(input_file)
 
-        features = self._get_input_features()
+        input_features = self._get_input_features()
 
-        all_features = collections.defaultdict(list)
+        self.features = collections.defaultdict(list)
 
-        for feature in features:
-            all_features["input_ids"].append(feature.input_ids)
-            all_features["input_mask"].append(feature.input_mask)
-            all_features["input_type_ids"].append(feature.input_type_ids)
-            all_features["embedding_tensor_name"].append(feature.embedding_tensor_name)
-            all_features["service_id"].append(feature.service_id)
-            all_features["intent_or_slot_id"].append(feature.intent_or_slot_id)
-            all_features["value_id"].append(feature.value_id)
-        self.features = all_features
+        for feature in input_features:
+            self.features["input_ids"].append(feature.input_ids)
+            self.features["input_mask"].append(feature.input_mask)
+            self.features["input_type_ids"].append(feature.input_type_ids)
+            self.features["embedding_tensor_name"].append(feature.embedding_tensor_name)
+            self.features["service_id"].append(feature.service_id)
+            self.features["intent_or_slot_id"].append(feature.intent_or_slot_id)
+            self.features["value_id"].append(feature.value_id)
 
     def __len__(self):
         return len(self.features['input_ids'])
@@ -340,6 +339,7 @@ class SchemaEmbeddingDataset(Dataset):
                                          bert_hidden_states)
         with open(output_file, "wb") as f_s:
             np.save(f_s, schema_embeddings)
+        f_s.close()
 
 class InputFeatures(object):
   """A single set of features for BERT inference."""
