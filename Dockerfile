@@ -30,7 +30,7 @@ RUN git clone -n https://github.com/onnx/onnx-tensorrt.git && cd onnx-tensorrt &
 
 WORKDIR /workspace/nemo
 
-COPY requirements/requirements_docker.txt requirements.txt
+COPY requirements.txt .
 RUN pip install --disable-pip-version-check -U -r requirements.txt
 
 COPY . .

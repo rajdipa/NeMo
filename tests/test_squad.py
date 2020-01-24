@@ -1,41 +1,15 @@
-# ! /usr/bin/python
-# -*- coding: utf-8 -*-
-
-# Copyright 2019 NVIDIA. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# =============================================================================
-
+# Copyright (c) 2019 NVIDIA Corporation
 import json
 import os
 import shutil
 import sys
 
-import nemo
+from .context import nemo, nemo_nlp
+from .common_setup import NeMoUnitTest
 from nemo.utils.lr_policies import get_lr_policy
-
-import nemo.collections.nlp as nemo_nlp
-from nemo.collections.nlp.utils.callbacks.squad import \
+from nemo_nlp.utils.callbacks.squad import \
     eval_iter_callback, eval_epochs_done_callback
 
-from .common_setup import NeMoUnitTest
-
-# pep8: disable=E402
-sys.path.insert(0, os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '../examples/nlp/scripts')))
-
-from download_squad import SquadDownloader
-# pep8: enable=E402
 
 class TestSquad(NeMoUnitTest):
 
@@ -54,6 +28,7 @@ class TestSquad(NeMoUnitTest):
                 os.path.join(os.path.dirname(__file__),
                              '../examples/nlp/scripts'))
             sys.path.insert(0, download_script_path)
+            from download_squad import SquadDownloader
             print("Extracting Squad data to: {0}".format(squad_folder))
             squad_dl = SquadDownloader(data_folder)
             squad_dl.download()
