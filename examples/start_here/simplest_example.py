@@ -12,6 +12,9 @@ dl = nemo.tutorials.RealFunctionDataLayer(
 fx = nemo.tutorials.TaylorNet(dim=4)
 loss = nemo.tutorials.MSELoss()
 
+print(dl._local_parameters)
+
+
 # describe activation's flow
 x, y = dl()
 p = fx(x=x)

@@ -3,6 +3,7 @@
 __all__ = ['WeightShareTransform',
            'NeuralModule']
 
+import inspect
 
 from abc import ABC, abstractmethod
 from collections import namedtuple
@@ -13,6 +14,7 @@ import uuid
 import collections
 
 
+import nemo
 from nemo.core import NeuralModuleFactory
 from nemo.utils.decorators.deprecated import deprecated
 
@@ -49,6 +51,28 @@ class NeuralModule(ABC):
             whatever is specified in factory.
     """
 
+    def extract_init_params(self):
+        # Get names of arguments of the original module init method.
+        init_keys = inspect.getfullargspec(type(self).__init__).kwonlyargs
+        print(init_keys)
+
+        # Create list of params.
+        init_params = {}.fromkeys(init_keys)
+        print(init_params)
+
+        # Retrieve values of those params from the call list.
+        for frame in stack()[1:]:
+            localvars = getargvalues(frame[0]).locals
+            # print("localvars: ", localvars)
+            for key in init_keys:
+                # Found the variable!
+                if key in localvars.keys():
+                    # Save the value.
+                    init_params[key] = localvars[key]
+
+        # Return parameters.
+        return init_params
+
     def __init__(
             self, *,
             pretrained_model_name=None,
@@ -56,6 +80,14 @@ class NeuralModule(ABC):
             placement=None,
             **kwargs
     ):
+
+        self._init_params = self.extract_init_params()
+
+        # Check the types of the values.
+        for key, value in self._init_params.items():
+            print(type(value))
+
+        exit(1)
         self._pretrained_model_name = pretrained_model_name
         self._local_parameters = self.update_local_params()
 
@@ -83,7 +115,7 @@ class NeuralModule(ABC):
         #        "arguments:".format(self.__class__.__name__))
         #    nemo.logging.warning("{}".format(kwargs.keys()))
 
-    @deprecated()
+    @deprecated(version=0.11)
     @staticmethod
     def create_ports(**kwargs):
         """ Deprecated method, to be remoted in the next release."""
@@ -109,6 +141,7 @@ class NeuralModule(ABC):
           A (dict) of module's output ports names to NeuralTypes mapping
         """
 
+    @deprecated(version=0.11)
     @staticmethod
     def pretrained_storage():
         return ''
@@ -422,6 +455,7 @@ class NeuralModule(ABC):
         """
         pass
 
+    @deprecated(version=0.11)
     @staticmethod
     def update_local_params():
         """
