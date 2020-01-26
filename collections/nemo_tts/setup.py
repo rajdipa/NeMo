@@ -25,6 +25,7 @@ setuptools.setup(
         'matplotlib',
         'scipy',
         'ruamel.yaml',
-        'pypinyin'
+        'pypinyin',
+        'attrdict',
     ]
 )
