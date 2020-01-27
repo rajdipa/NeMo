@@ -8,7 +8,7 @@ from nemo.backends.pytorch.nm import TrainableNM
 from nemo.core.neural_types import *
 from nemo_nlp.transformer.utils import transformer_weights_init
 
-activations = {
+ACTIVATIONS_F = {
     "tanh": nn.Tanh,
     "relu": nn.ReLU,
 }
@@ -30,14 +30,8 @@ class Encoder(TrainableNM):
 
     @property
     def input_ports(self):
-        """Returns definitions of module input ports.
-
-        hidden_states:
-            0: AxisType(BatchTag)
-
-            1: AxisType(TimeTag)
-
-            2: AxisType(ChannelTag)
+        """
+        Returns definitions of module input ports.
         """
         return {
             "hidden_states": NeuralType({
@@ -70,7 +64,12 @@ class Encoder(TrainableNM):
                  use_transformer_pretrained=True):
         super().__init__()
         self.fc = nn.Linear(hidden_size, hidden_size).to(self._device)
-        self.activation = getattr(torch, activation)
+
+        if activation not in ACTIVATIONS_F:
+            raise ValueError(f'{activation} is not in supported ' +
+                             '{ACTIVATIONS_F.keys()}')
+
+        self.activation = ACTIVATIONS_F[activation]() 
         self.dropout = nn.Dropout(dropout)
 
         if use_transformer_pretrained:
@@ -83,5 +82,5 @@ class Encoder(TrainableNM):
         logits = self.fc(first_token_hidden_states)
         logits = self.activation(logits)
         logits = self.dropout(logits)
-        
+        import pdb; pdb.set_trace()
         return logits

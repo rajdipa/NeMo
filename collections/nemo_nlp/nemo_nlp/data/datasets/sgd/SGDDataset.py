@@ -28,9 +28,7 @@ class SGDDataset(Dataset):
                  dialogues_example_dir,
                  overwrite_dial_file,
                  dataset_split,
-                 schema_emb_processor):
-
-        
+                 schema_emb_processor):  
 
         # Generate the dialogue examples if needed or specified.
         dial_file_name = f"{task_name}_{dataset_split}_examples.processed"
@@ -66,9 +64,6 @@ class SGDDataset(Dataset):
             nemo.logging.info("Finish generating the dialogue examples.")
 
         self.schema_data_dict = schema_emb_processor._get_schema_embeddings()
-        import pdb; pdb.set_trace()
-        print()
-
 
     def __len__(self):
         return len(self.features)
@@ -77,31 +72,39 @@ class SGDDataset(Dataset):
         ex = self.features[idx]
         service_id = ex.service_schema.service_id
 
-        return (ex.example_id,
-                ex.is_real_example,
-                service_id,
-                ex.utterance_ids,
-                ex.utterance_segment,
-                ex.utterance_mask,
-                ex.num_categorical_slots,
-                ex.categorical_slot_status,
-                ex.num_categorical_slot_values,
-                ex.categorical_slot_values,
-                ex.num_noncategorical_slots,
-                ex.noncategorical_slot_status,
-                ex.noncategorical_slot_value_start,
-                ex.noncategorical_slot_value_end,
-                ex.start_char_idx,
-                ex.end_char_idx,
-                ex.num_slots,
-                ex.requested_slot_status,
-                ex.num_intents,
-                ex.intent_status,
-                self.schema_data_dict['cat_slot_emb'][service_id],
-                self.schema_data_dict['cat_slot_value_emb'][service_id],
-                self.schema_data_dict['noncat_slot_emb'][service_id],
-                self.schema_data_dict['req_slot_emb'][service_id],
-                self.schema_data_dict['intent_emb'][service_id])
+        return (#np.array(ex.example_id),
+                np.array(ex.is_real_example),
+                np.array(service_id),
+                np.array(ex.utterance_ids),
+                np.array(ex.utterance_segment),
+                np.array(ex.utterance_mask, dtype=np.long),
+                np.array(ex.num_categorical_slots),
+                np.array(ex.categorical_slot_status),
+                np.array(ex.num_categorical_slot_values),
+                np.array(ex.categorical_slot_values),
+                np.array(ex.num_noncategorical_slots),
+                np.array(ex.noncategorical_slot_status),
+                np.array(ex.noncategorical_slot_value_start),
+                np.array(ex.noncategorical_slot_value_end),
+                np.array(ex.start_char_idx),
+                np.array(ex.end_char_idx),
+                np.array(ex.num_slots),
+                np.array(ex.requested_slot_status),
+                np.array(ex.num_intents),
+                np.array(ex.intent_status),
+                np.array(self.schema_data_dict['cat_slot_emb'][service_id]),
+                np.array(self.schema_data_dict['cat_slot_value_emb'][service_id]),
+                np.array(self.schema_data_dict['noncat_slot_emb'][service_id]),
+                np.array(self.schema_data_dict['req_slot_emb'][service_id]),
+                np.array(self.schema_data_dict['intent_emb'][service_id]))
+
+        """
+        [('cat_slot_emb', (6, 768)),
+         ('cat_slot_value_emb', (6, 11, 768)), 
+         ('noncat_slot_emb', (12, 768)), 
+         ('req_slot_emb', (18, 768)), 
+         ('intent_emb', (4, 768))]
+        """
         
 
 

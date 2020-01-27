@@ -14,7 +14,7 @@ __all__ = ['JointIntentSlotLoss',
            'PaddedSmoothedCrossEntropyLossNM',
            'QuestionAnsweringLoss',
            'TokenClassificationLoss',
-           'SGDDSTBaselineLoss']
+           'SGDDialogueStateLoss']
 
 
 class QuestionAnsweringLoss(LossNM):
@@ -513,7 +513,7 @@ class PaddedSmoothedCrossEntropyLossNM(LossNM):
         return loss
 
 
-class SGDDSTBaselineLoss(LossNM):
+class SGDDialogueStateLoss(LossNM):
     """
     Neural module which implements Token Classification loss.
 
@@ -549,8 +549,7 @@ class SGDDSTBaselineLoss(LossNM):
         return {
             "logits": NeuralType({
                 0: AxisType(BatchTag),
-                1: AxisType(TimeTag),
-                2: AxisType(ChannelTag)
+                1: AxisType(ChannelTag)
             }),
             # "labels": NeuralType({
             #     0: AxisType(BatchTag),
@@ -582,6 +581,4 @@ class SGDDSTBaselineLoss(LossNM):
         # self.num_classes = num_classes
 
     def _loss_function(self, logits):
-        import pdb; pdb.set_trace()
-        loss = logits
-        return loss
+        return sum(logits.view(-1))

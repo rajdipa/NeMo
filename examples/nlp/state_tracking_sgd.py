@@ -18,6 +18,7 @@ import nemo_nlp.data.datasets.sgd.sgd_preprocessing as utils
 from nemo_nlp.data.datasets.sgd import tokenization
 from nemo_nlp.utils.callbacks.joint_intent_slot import \
     eval_iter_callback, eval_epochs_done_callback
+from nemo.utils.lr_policies import get_lr_policy
 
 from nemo_nlp.modules import sgd_modules
 
@@ -45,7 +46,7 @@ parser.add_argument("--dropout", default=0.1, type=float,
 parser.add_argument("--num_epochs", default=1, type=int,
                     help="Number of epochs for training")
 parser.add_argument("--optimizer_kind", default="adam", type=str)
-parser.add_argument("--train_batch_size", default=32, type=int,
+parser.add_argument("--train_batch_size", default=1, type=int,
                     help="Total batch size for training.")
 parser.add_argument("--eval_batch_size", default=8, type=int,
                     help="Total batch size for eval.")
@@ -53,13 +54,18 @@ parser.add_argument("--predict_batch_size", default=8, type=int,
                     help="Total batch size for predict.")
 parser.add_argument("--learning_rate", default=1e-4, type=float, 
                     help="The initial learning rate for Adam.")
+parser.add_argument("--lr_policy", default="WarmupAnnealing", type=str)
 parser.add_argument("--num_train_epochs", default=80.0, type=int,
                     help="Total number of training epochs to perform.")
-parser.add_argument("--warmup_proportion", default=0.1, type=float,
+parser.add_argument("--lr_warmup_proportion", default=0.1, type=float,
                     help="Proportion of training to perform linear learning rate warmup for. "
                     "E.g., 0.1 = 10% of training.")
 parser.add_argument("--save_checkpoints_steps", default=1000, type=int,
                     help="How often to save the model checkpoint.")
+parser.add_argument("--local_rank", default=None, type=int)
+parser.add_argument("--amp_opt_level", default="O0",
+                    type=str, choices=["O0", "O1", "O2"])
+parser.add_argument("--num_gpus", default=1, type=int)
 
 # Input and output paths and other flags.
 parser.add_argument("--task_name", default="dstc8_single_domain", type=str,
@@ -87,9 +93,7 @@ parser.add_argument("--shuffle", type=bool, default=False,
 parser.add_argument("--dataset_split", type=str, required=True,
                     choices=["train", "dev", "test"],
                     help="Dataset split for training / prediction.")
-parser.add_argument("--local_rank", default=None, type=int)
-parser.add_argument("--amp_opt_level", default="O0",
-                    type=str, choices=["O0", "O1", "O2"])
+
 
 
 args = parser.parse_args()
@@ -174,35 +178,60 @@ encoder_extractor = sgd_modules.Encoder(hidden_size=hidden_size,
 utterance_encoding = encoder_extractor(hidden_states=encoded_tokens)
 
 
-nf.infer(tensors=[utterance_encoding],
-         checkpoint_dir=args.bert_ckpt_dir)
-
-import pdb; pdb.set_trace()
-print ()
+dst_loss = nemo_nlp.SGDDialogueStateLoss()
+loss = dst_loss(logits=utterance_encoding)
 
 
-# from schema embedding
-outputs = {}
-outputs["logit_intent_status"] = self._get_intents(features)
-outputs["logit_req_slot_status"] = self._get_requested_slots(features)
-cat_slot_status, cat_slot_value = self._get_categorical_slot_goals(features)
-outputs["logit_cat_slot_status"] = cat_slot_status
-outputs["logit_cat_slot_value"] = cat_slot_value
-noncat_slot_status, noncat_span_start, noncat_span_end = (
-    self._get_noncategorical_slot_goals(features))
-outputs["logit_noncat_slot_status"] = noncat_slot_status
-outputs["logit_noncat_slot_start"] = noncat_span_start
-outputs["logit_noncat_slot_end"] = noncat_span_end
+# intent_embeddings = input_data.intent_emb
+# # from schema embedding
+# outputs = {}
+# outputs["logit_intent_status"] = self._get_intents(features)
+# outputs["logit_req_slot_status"] = self._get_requested_slots(features)
+# cat_slot_status, cat_slot_value = self._get_categorical_slot_goals(features)
+# outputs["logit_cat_slot_status"] = cat_slot_status
+# outputs["logit_cat_slot_value"] = cat_slot_value
+# noncat_slot_status, noncat_span_start, noncat_span_end = (
+#     self._get_noncategorical_slot_goals(features))
+# outputs["logit_noncat_slot_status"] = noncat_slot_status
+# outputs["logit_noncat_slot_start"] = noncat_span_start
+# outputs["logit_noncat_slot_end"] = noncat_span_end
 
 
+train_tensors = loss
+steps_per_epoch = len(train_datalayer) // (args.train_batch_size * args.num_gpus)
+print (steps_per_epoch, len(train_datalayer))
+# import pdb; pdb.set_trace()
+# Create trainer and execute training action
+train_callback = nemo.core.SimpleLossLoggerCallback(
+    tensors=train_tensors,
+    print_func=lambda x: print("Loss: {:.3f}".format(x[0].item())),
+    get_tb_values=lambda x: [["loss", x[0]]],
+    tb_writer=nf.tb_writer)
 
-# nf.train(tensors_to_optimize=[utterance_encoding],
-#          # callbacks=[train_callback, eval_callback, ckpt_callback],
-#          # lr_policy=lr_policy_fn,
-#          optimizer=args.optimizer_kind,
-#          optimization_params={"num_epochs": args.num_epochs,
-#                               "lr": args.learning_rate}
-#                               )
+# eval_callback = nemo.core.EvaluatorCallback(
+#     eval_tensors=eval_tensors,
+#     user_iter_callback=lambda x, y: eval_iter_callback(x, y),
+#     user_epochs_done_callback=lambda x:
+#         eval_epochs_done_callback(x, label_ids, f'{nf.work_dir}/graphs'),
+#     tb_writer=nf.tb_writer,
+#     eval_step=steps_per_epoch)
+
+# ckpt_callback = nemo.core.CheckpointCallback(
+#     folder=nf.checkpoint_dir,
+#     epoch_freq=args.save_epoch_freq,
+#     step_freq=args.save_step_freq)
+
+lr_policy_fn = get_lr_policy(args.lr_policy,
+                             total_steps=args.num_epochs * steps_per_epoch,
+                             warmup_ratio=args.lr_warmup_proportion)
+
+nf.train(tensors_to_optimize=[loss],
+         callbacks=[train_callback],
+         lr_policy=lr_policy_fn,
+         optimizer=args.optimizer_kind,
+         optimization_params={"num_epochs": args.num_epochs,
+                              "lr": args.learning_rate}
+                              )
 
 
 # encoded_utterance = bert_encoder.get_pooled_output()
